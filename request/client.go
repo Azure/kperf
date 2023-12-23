@@ -1,8 +1,8 @@
 package request
 
 import (
+	"fmt"
 	"math"
-	"net/http"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -16,7 +16,7 @@ import (
 // 1. Is it possible to build one http2 client with multiple connections?
 // 2. How to monitor HTTP2 GOAWAY frame?
 // 3. Support Protobuf as accepted content
-func NewClients(kubeCfgPath string, num int, userAgent string, qps int) ([]rest.Interface, error) {
+func NewClients(kubeCfgPath string, ConnsNum int, userAgent string, qps int, contentType string) ([]rest.Interface, error) {
 	restCfg, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
 
 	if err != nil {
@@ -35,20 +35,24 @@ func NewClients(kubeCfgPath string, num int, userAgent string, qps int) ([]rest.
 	if restCfg.UserAgent == "" {
 		restCfg.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
-	//set number of connections per host
-	restCfg.Transport = &http.Transport{
-		MaxConnsPerHost: num,
+
+	// Set the content type
+	switch contentType {
+	case "json":
+		restCfg.ContentType = "application/json"
+	case "protobuf":
+		restCfg.ContentType = "application/vnd.kubernetes.protobuf"
+	default:
+		return nil, fmt.Errorf("invalid content type: %s", contentType)
 	}
 
-	//set Protobuf as accepted content
-	restCfg.ContentType = "application/vnd.kubernetes.protobuf"
-
-	restClients := make([]rest.Interface, 0, num)
-	for i := 0; i < num; i++ {
+	restClients := make([]rest.Interface, 0, ConnsNum)
+	for i := 0; i < ConnsNum; i++ {
 		cfgShallowCopy := *restCfg
 
 		restCli, err := rest.UnversionedRESTClientFor(&cfgShallowCopy)
 		if err != nil {
+			fmt.Printf("Failed to create rest client: %v\n", err)
 			return nil, err
 		}
 		restClients = append(restClients, restCli)

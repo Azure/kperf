@@ -17,7 +17,7 @@ import (
 const defaultTimeout = 60 * time.Second
 
 // Schedule files requests to apiserver based on LoadProfileSpec.
-func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.Interface) (*types.ResponseStats, error) {
+func Schedule(ctx context.Context, clientNum int, spec *types.LoadProfileSpec, restCli []rest.Interface) (*types.ResponseStats, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -36,10 +36,11 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 	var wg sync.WaitGroup
 
 	respMetric := metrics.NewResponseMetric()
-	for _, cli := range restCli {
-		cli := cli
+	for i := 0; i < clientNum; i++ {
+		//reuse connection if client > conns
+		cli := restCli[i%len(restCli)]
 		wg.Add(1)
-		go func() {
+		go func(cli rest.Interface) {
 			defer wg.Done()
 
 			for builder := range reqBuilderCh {
@@ -69,7 +70,7 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 					}
 				}()
 			}
-		}()
+		}(cli)
 	}
 
 	start := time.Now()
@@ -80,14 +81,11 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 
 	totalDuration := time.Since(start)
 
-	latencies, failures, err := respMetric.Gather()
-	if err != nil {
-		return nil, err
-	}
+	_, percentileLatencies, failures := respMetric.Gather()
 	return &types.ResponseStats{
-		Total:     spec.Total,
-		Failures:  failures,
-		Duration:  totalDuration,
-		Latencies: latencies,
+		Total:               spec.Total,
+		Failures:            failures,
+		Duration:            totalDuration,
+		PercentileLatencies: percentileLatencies,
 	}, nil
 }

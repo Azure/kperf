@@ -1,0 +1,17 @@
+version: 1
+description: test
+spec:
+  rate: 100
+  total: 11
+  conns: 10
+  requests:
+  - staleList:
+      version: v1
+      resource: pods
+      limit: 500
+    shares: 100
+  - quorumList:
+      version: v1
+      resource: pods
+      limit: 1000
+    shares: 150
