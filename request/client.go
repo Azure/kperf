@@ -2,6 +2,7 @@ package request
 
 import (
 	"math"
+	"net/http"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -17,6 +18,7 @@ import (
 // 3. Support Protobuf as accepted content
 func NewClients(kubeCfgPath string, num int, userAgent string, qps int) ([]rest.Interface, error) {
 	restCfg, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
+
 	if err != nil {
 		return nil, err
 	}
@@ -24,13 +26,22 @@ func NewClients(kubeCfgPath string, num int, userAgent string, qps int) ([]rest.
 	if qps == 0 {
 		qps = math.MaxInt32
 	}
+
 	restCfg.QPS = float32(qps)
 	restCfg.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	restCfg.UserAgent = userAgent
+
 	if restCfg.UserAgent == "" {
 		restCfg.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
+	//set number of connections per host
+	restCfg.Transport = &http.Transport{
+		MaxConnsPerHost: num,
+	}
+
+	//set Protobuf as accepted content
+	restCfg.ContentType = "application/vnd.kubernetes.protobuf"
 
 	restClients := make([]rest.Interface, 0, num)
 	for i := 0; i < num; i++ {
