@@ -3,6 +3,7 @@ package commands
 import (
 	"github.com/Azure/kperf/cmd/kperf/commands/multirunners"
 	"github.com/Azure/kperf/cmd/kperf/commands/runner"
+	"github.com/Azure/kperf/cmd/kperf/commands/virtualcluster"
 
 	"github.com/urfave/cli"
 )
@@ -15,6 +16,7 @@ func App() *cli.App {
 		Commands: []cli.Command{
 			runner.Command,
 			multirunners.Command,
+			virtualcluster.Command,
 		},
 	}
 }

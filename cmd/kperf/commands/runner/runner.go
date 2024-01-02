@@ -30,6 +30,11 @@ var runCommand = cli.Command{
 			Name:  "kubeconfig",
 			Usage: "Path to the kubeconfig file",
 		},
+		cli.IntFlag{
+			Name:  "client",
+			Usage: "Total number of HTTP clients",
+			Value: 1,
+		},
 		cli.StringFlag{
 			Name:     "config",
 			Usage:    "Path to the configuration file",
@@ -39,6 +44,11 @@ var runCommand = cli.Command{
 			Name:  "conns",
 			Usage: "Total number of connections. It can override corresponding value defined by --config",
 			Value: 1,
+		},
+		cli.StringFlag{
+			Name:  "content-type",
+			Usage: "Content type (json or protobuf)",
+			Value: "json",
 		},
 		cli.IntFlag{
 			Name:  "rate",
@@ -60,17 +70,20 @@ var runCommand = cli.Command{
 			return err
 		}
 
+		// Get the content type from the command-line flag
+		contentType := cliCtx.String("content-type")
 		kubeCfgPath := cliCtx.String("kubeconfig")
 		userAgent := cliCtx.String("user-agent")
 
 		conns := profileCfg.Spec.Conns
+		client := profileCfg.Spec.Conns
 		rate := profileCfg.Spec.Rate
-		restClis, err := request.NewClients(kubeCfgPath, conns, userAgent, rate)
+		restClis, err := request.NewClients(kubeCfgPath, conns, userAgent, rate, contentType)
 		if err != nil {
 			return err
 		}
+		stats, err := request.Schedule(context.TODO(), client, &profileCfg.Spec, restClis)
 
-		stats, err := request.Schedule(context.TODO(), &profileCfg.Spec, restClis)
 		if err != nil {
 			return err
 		}
@@ -95,11 +108,15 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 	}
 
 	// override value by flags
-	//
-	// TODO(weifu): do not override if flag is not set
-	profileCfg.Spec.Rate = cliCtx.Int("rate")
-	profileCfg.Spec.Conns = cliCtx.Int("conns")
-	profileCfg.Spec.Total = cliCtx.Int("total")
+	if v := "rate"; cliCtx.IsSet(v) {
+		profileCfg.Spec.Rate = cliCtx.Int(v)
+	}
+	if v := "conns"; cliCtx.IsSet(v) || profileCfg.Spec.Conns == 0 {
+		profileCfg.Spec.Conns = cliCtx.Int(v)
+	}
+	if v := "total"; cliCtx.IsSet(v) || profileCfg.Spec.Total == 0 {
+		profileCfg.Spec.Total = cliCtx.Int(v)
+	}
 
 	if err := profileCfg.Validate(); err != nil {
 		return nil, err
@@ -116,13 +133,13 @@ func printResponseStats(stats *types.ResponseStats) {
 	fmt.Printf("  Requests/sec: %.2f\n", float64(stats.Total)/stats.Duration.Seconds())
 
 	fmt.Println("  Latency Distribution:")
-	keys := make([]float64, 0, len(stats.Latencies))
-	for q := range stats.Latencies {
+	keys := make([]float64, 0, len(stats.PercentileLatencies))
+	for q := range stats.PercentileLatencies {
 		keys = append(keys, q)
 	}
 	sort.Float64s(keys)
 
 	for _, q := range keys {
-		fmt.Printf("    [%.2f] %.3fs\n", q, stats.Latencies[q])
+		fmt.Printf("    [%.2f] %.3fs\n", q/100.0, stats.PercentileLatencies[q])
 	}
 }

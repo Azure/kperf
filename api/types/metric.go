@@ -10,10 +10,10 @@ type ResponseStats struct {
 	Failures int
 	// Duration means the time of benchmark.
 	Duration time.Duration
-	// Latencies represents the latency distribution in seconds.
+	// PercentileLatencies represents the latency distribution in seconds.
 	//
 	// NOTE: The key represents quantile.
-	Latencies map[float64]float64
+	PercentileLatencies map[float64]float64
 	// TODO:
 	// 1. Support total read/upload bytes
 	// 2. Support failures partitioned by http code and verb
