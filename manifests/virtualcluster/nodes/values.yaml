@@ -1,0 +1,6 @@
+name: ""
+controllerNodeSelectors: {}
+replicas: 0
+nodeLabels: {}
+cpu: 0
+memory: 0
