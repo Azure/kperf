@@ -1,10 +1,11 @@
 package metrics
 
 import (
-	"fmt"
+	"container/list"
+	"math"
+	"sort"
+	"sync"
 	"sync/atomic"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // ResponseMetric is a measurement related to http response.
@@ -14,30 +15,26 @@ type ResponseMetric interface {
 	// ObserveFailure observes failure response.
 	ObserveFailure()
 	// Gather returns the summary.
-	Gather() (latencies map[float64]float64, failure int, _ error)
+	Gather() (latencies []float64, percentileLatencies map[float64]float64, failure int)
 }
 
 type responseMetricImpl struct {
-	latencySeconds *prometheus.SummaryVec
-	failureCount   int64
+	mu           sync.Mutex
+	failureCount int64
+	latencies    *list.List
 }
 
 func NewResponseMetric() ResponseMetric {
 	return &responseMetricImpl{
-		latencySeconds: prometheus.NewSummaryVec(
-			prometheus.SummaryOpts{
-				Namespace:  "request",
-				Name:       "request_latency_seconds",
-				Objectives: map[float64]float64{0: 0, 0.5: 0, 0.9: 0, 0.95: 0, 0.99: 0, 1: 0},
-			},
-			[]string{},
-		),
+		latencies: list.New(),
 	}
 }
 
 // ObserveLatency implements ResponseMetric.
 func (m *responseMetricImpl) ObserveLatency(seconds float64) {
-	m.latencySeconds.WithLabelValues().Observe(seconds)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.latencies.PushBack(seconds)
 }
 
 // ObserveFailure implements ResponseMetric.
@@ -46,19 +43,39 @@ func (m *responseMetricImpl) ObserveFailure() {
 }
 
 // Gather implements ResponseMetric.
-func (m *responseMetricImpl) Gather() (map[float64]float64, int, error) {
-	reg := prometheus.NewRegistry()
-	reg.MustRegister(m.latencySeconds)
+func (m *responseMetricImpl) Gather() ([]float64, map[float64]float64, int) {
+	latencies := m.dumpLatencies()
 
-	metricFamilies, err := reg.Gather()
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to gather from local registry: %w", err)
+	return latencies, buildPercentileLatencies(latencies), int(atomic.LoadInt64(&m.failureCount))
+}
+
+func (m *responseMetricImpl) dumpLatencies() []float64 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	res := make([]float64, 0, m.latencies.Len())
+	for e := m.latencies.Front(); e != nil; e = e.Next() {
+		res = append(res, e.Value.(float64))
+	}
+	return res
+}
+
+var percentiles = []float64{0, 50, 90, 95, 99, 100}
+
+func buildPercentileLatencies(latencies []float64) map[float64]float64 {
+	if len(latencies) == 0 {
+		return nil
 	}
 
-	latencies := map[float64]float64{}
-	for _, q := range metricFamilies[0].GetMetric()[0].GetSummary().GetQuantile() {
-		latencies[q.GetQuantile()] = q.GetValue()
-	}
+	res := make(map[float64]float64, len(percentiles))
 
-	return latencies, int(atomic.LoadInt64(&m.failureCount)), nil
+	n := len(latencies)
+	sort.Float64s(latencies)
+	for _, p := range percentiles {
+		idx := int(math.Ceil(float64(n) * p / 100))
+		if idx > 0 {
+			idx--
+		}
+		res[p] = latencies[idx]
+	}
+	return res
 }
