@@ -1,7 +1,11 @@
 package virtualcluster
 
 import (
+	"context"
 	"fmt"
+	"strings"
+
+	"github.com/Azure/kperf/virtualcluster"
 
 	"github.com/urfave/cli"
 )
@@ -44,7 +48,23 @@ var nodepoolAddCommand = cli.Command{
 		},
 	},
 	Action: func(cliCtx *cli.Context) error {
-		return fmt.Errorf("nodepool add - not implemented")
+		if cliCtx.NArg() != 1 {
+			return fmt.Errorf("required only one argument as nodepool name")
+		}
+		nodepoolName := strings.TrimSpace(cliCtx.Args().Get(0))
+		if len(nodepoolName) == 0 {
+			return fmt.Errorf("required non-empty nodepool name")
+		}
+
+		kubeCfgPath := cliCtx.String("kubeconfig")
+
+		return virtualcluster.CreateNodepool(context.Background(),
+			kubeCfgPath,
+			nodepoolName,
+			virtualcluster.WithNodepoolCPUOpt(cliCtx.Int("cpu")),
+			virtualcluster.WithNodepoolMemoryOpt(cliCtx.Int("memory")),
+			virtualcluster.WithNodepoolCountOpt(cliCtx.Int("nodes")),
+		)
 	},
 }
 

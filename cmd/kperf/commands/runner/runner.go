@@ -128,7 +128,10 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 func printResponseStats(stats *types.ResponseStats) {
 	fmt.Println("Response stat:")
 	fmt.Printf("  Total: %v\n", stats.Total)
-	fmt.Printf("  Failures: %v\n", stats.Failures)
+	fmt.Printf("  Total Failures: %v\n", len(stats.FailureList))
+	for _, v := range stats.FailureList {
+		fmt.Printf("  Failure: %v\n", v)
+	}
 	fmt.Printf("  Duration: %v\n", stats.Duration)
 	fmt.Printf("  Requests/sec: %.2f\n", float64(stats.Total)/stats.Duration.Seconds())
 
