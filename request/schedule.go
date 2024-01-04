@@ -17,7 +17,7 @@ import (
 const defaultTimeout = 60 * time.Second
 
 // Schedule files requests to apiserver based on LoadProfileSpec.
-func Schedule(ctx context.Context, clientNum int, spec *types.LoadProfileSpec, restCli []rest.Interface) (*types.ResponseStats, error) {
+func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.Interface) (*types.ResponseStats, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -36,8 +36,8 @@ func Schedule(ctx context.Context, clientNum int, spec *types.LoadProfileSpec, r
 	var wg sync.WaitGroup
 
 	respMetric := metrics.NewResponseMetric()
-	for i := 0; i < clientNum; i++ {
-		//reuse connection if client > conns
+	for i := 0; i < spec.Client; i++ {
+		// reuse connection if clients > conns
 		cli := restCli[i%len(restCli)]
 		wg.Add(1)
 		go func(cli rest.Interface) {

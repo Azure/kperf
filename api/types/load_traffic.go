@@ -20,6 +20,8 @@ type LoadProfileSpec struct {
 	Total int `json:"total" yaml:"total"`
 	// Conns defines total number of long connections used for traffic.
 	Conns int `json:"conns" yaml:"conns"`
+	// Client defines total number of HTTP clients.
+	Client int `json:"client" yaml:"client"`
 	// Requests defines the different kinds of requests with weights.
 	// The executor should randomly pick by weight.
 	Requests []*WeightedRequest

@@ -15,10 +15,8 @@ import (
 //
 // 1. Is it possible to build one http2 client with multiple connections?
 // 2. How to monitor HTTP2 GOAWAY frame?
-// 3. Support Protobuf as accepted content
 func NewClients(kubeCfgPath string, ConnsNum int, userAgent string, qps int, contentType string) ([]rest.Interface, error) {
 	restCfg, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
-
 	if err != nil {
 		return nil, err
 	}
@@ -26,12 +24,10 @@ func NewClients(kubeCfgPath string, ConnsNum int, userAgent string, qps int, con
 	if qps == 0 {
 		qps = math.MaxInt32
 	}
-
 	restCfg.QPS = float32(qps)
 	restCfg.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
 
 	restCfg.UserAgent = userAgent
-
 	if restCfg.UserAgent == "" {
 		restCfg.UserAgent = rest.DefaultKubernetesUserAgent()
 	}
@@ -52,7 +48,6 @@ func NewClients(kubeCfgPath string, ConnsNum int, userAgent string, qps int, con
 
 		restCli, err := rest.UnversionedRESTClientFor(&cfgShallowCopy)
 		if err != nil {
-			fmt.Printf("Failed to create rest client: %v\n", err)
 			return nil, err
 		}
 		restClients = append(restClients, restCli)
