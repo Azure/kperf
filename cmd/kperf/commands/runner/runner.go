@@ -2,15 +2,20 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
+
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/Azure/kperf/api/types"
 	"github.com/Azure/kperf/request"
 
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
+	"k8s.io/klog/v2"
 )
 
 // Command represents runner subcommand.
@@ -67,8 +72,30 @@ var runCommand = cli.Command{
 			Name:  "result",
 			Usage: "Path to the file which stores results",
 		},
+		cli.BoolFlag{
+			Name:  "raw-data",
+			Usage: "write ResponseStats to file in .json format",
+		},
+		cli.StringFlag{
+			Name:  "v",
+			Usage: "log level for V logs",
+			Value: "0",
+		},
 	},
 	Action: func(cliCtx *cli.Context) error {
+		// initialize klog
+		klog.InitFlags(nil)
+
+		vFlag, err := strconv.Atoi(cliCtx.String("v"))
+		if err != nil || vFlag < 0 {
+			return fmt.Errorf("invalid value \"%v\" for flag -v: value must be a non-negative integer", cliCtx.String("v"))
+		}
+		if err := flag.Set("v", strconv.Itoa(cliCtx.Int("v"))); err != nil {
+			return fmt.Errorf("failed to set log level: %w", err)
+		}
+		defer klog.Flush()
+		flag.Parse()
+
 		profileCfg, err := loadConfig(cliCtx)
 		if err != nil {
 			return err
@@ -79,6 +106,7 @@ var runCommand = cli.Command{
 		kubeCfgPath := cliCtx.String("kubeconfig")
 		userAgent := cliCtx.String("user-agent")
 		outputFilePath := cliCtx.String("result")
+		rawDataFlagIncluded := cliCtx.Bool("result")
 
 		conns := profileCfg.Spec.Conns
 		rate := profileCfg.Spec.Rate
@@ -111,8 +139,11 @@ var runCommand = cli.Command{
 			defer f.Close()
 		}
 
-		//TODO: add printResponseStats for .json format
-		printResponseStats(f, stats)
+		err = printResponseStats(f, rawDataFlagIncluded, stats)
+		if err != nil {
+			return fmt.Errorf("error while printing response stats: %w", err)
+		}
+
 		return nil
 	},
 }
@@ -152,7 +183,27 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 	return &profileCfg, nil
 }
 
-// TODO: Complete this function
-func printResponseStats(f *os.File, stats *request.Result) {
-	fmt.Fprintf(f, "Response Stat: %v\n", stats)
+func printResponseStats(f *os.File, rawDataFlagIncluded bool, stats *request.Result) error {
+	output := types.RunnerMetricReport{
+		Total:              stats.Total,
+		FailureList:        stats.FailureList,
+		Duration:           stats.Duration,
+		Latencies:          stats.Latencies,
+		TotalReceivedBytes: stats.TotalReceivedBytes,
+	}
+
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "  ")
+
+	if !rawDataFlagIncluded {
+		output.Latencies = nil
+	}
+
+	err := encoder.Encode(output)
+	if err != nil {
+		return fmt.Errorf("failed to encode json: %w", err)
+	}
+
+	return nil
+
 }

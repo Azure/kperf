@@ -12,6 +12,7 @@ import (
 
 	"golang.org/x/time/rate"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 )
 
 const defaultTimeout = 60 * time.Second
@@ -55,7 +56,10 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 			for builder := range reqBuilderCh {
 				_, req := builder.Build(cli)
 
+				klog.V(9).Infof("Request URL: %s", req.URL())
+
 				if err := limiter.Wait(ctx); err != nil {
+					klog.V(9).Infof("Rate limiter wait failed: %v", err)
 					cancel()
 					return
 				}
@@ -77,6 +81,7 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 
 					if err != nil {
 						respMetric.ObserveFailure(err)
+						klog.V(9).Infof("Request stream failed: %v", err)
 					}
 				}()
 			}
