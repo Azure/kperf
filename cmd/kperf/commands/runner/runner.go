@@ -3,7 +3,6 @@ package runner
 import (
 	"context"
 	"encoding/json"
-
 	"flag"
 	"fmt"
 	"os"
