@@ -34,12 +34,12 @@ var Command = cli.Command{
 		cli.StringFlag{
 			Name:  "vc-affinity",
 			Usage: "Deploy virtualnode's controller with a specific labels (FORMAT: KEY=VALUE[,VALUE])",
-			Value: "node.kubernetes.io/instance-type=Standard_D8ds_v5,m4.2xlarge",
+			Value: "node.kubernetes.io/instance-type=Standard_D8s_v3,m4.2xlarge",
 		},
 		cli.StringFlag{
 			Name:  "rg-affinity",
 			Usage: "Deploy runner group with a specific labels (FORMAT: KEY=VALUE[,VALUE])",
-			Value: "node.kubernetes.io/instance-type=Standard_D8ds_v5,m4.4xlarge",
+			Value: "node.kubernetes.io/instance-type=Standard_D16s_v3,m4.4xlarge",
 		},
 		cli.BoolFlag{
 			Name:   "eks",
