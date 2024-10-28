@@ -144,7 +144,7 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 
 			spec.Profile.Spec.Total = reqs
 			spec.NodeAffinity = affinityLabels
-
+			spec.Profile.Spec.ContentType = types.ContentType(cliCtx.String("content-type"))
 			data, _ := yaml.Marshal(spec)
 			klog.V(2).InfoS("Load Profile", "config", string(data))
 

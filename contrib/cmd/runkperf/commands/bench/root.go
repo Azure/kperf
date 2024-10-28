@@ -80,4 +80,9 @@ var commonFlags = []cli.Flag{
 		Usage: "The maximum Pods per node",
 		Value: 110,
 	},
+	cli.StringFlag{
+		Name:  "content-type",
+		Usage: "Content type (json or protobuffer)",
+		Value: "json",
+	},
 }
