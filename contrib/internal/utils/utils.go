@@ -267,7 +267,7 @@ func DeployRunnerGroup(ctx context.Context,
 		// Using 1 min as timeout is to ensure we can get result in time.
 		data, err := kr.RGResult(ctx, 1*time.Minute)
 		if err != nil {
-			klog.ErrorS(err, "failed to fetch warmup runner group's result")
+			klog.ErrorS(err, "failed to fetch runner group's result")
 			continue
 		}
 		klog.InfoS("Runner group's result", "data", data)
