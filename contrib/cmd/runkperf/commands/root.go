@@ -10,7 +10,7 @@ import (
 	"strconv"
 
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/bench"
-	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/ekswarmup"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/warmup"
 
 	"github.com/urfave/cli"
 	"k8s.io/klog/v2"
@@ -22,7 +22,7 @@ func App() *cli.App {
 		Name: "runkperf",
 		// TODO: add more fields
 		Commands: []cli.Command{
-			ekswarmup.Command,
+			warmup.Command,
 			bench.Command,
 		},
 		Flags: []cli.Flag{

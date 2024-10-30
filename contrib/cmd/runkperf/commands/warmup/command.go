@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-package ekswarmup
+package warmup
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Azure/kperf/api/types"
+	kperfcmdutils "github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/contrib/internal/utils"
 
 	"github.com/urfave/cli"
@@ -21,10 +22,10 @@ import (
 	"k8s.io/klog/v2"
 )
 
-// Command represents ekswarmup subcommand.
+// Command represents warmup subcommand.
 var Command = cli.Command{
-	Name:  "ekswarmup",
-	Usage: "Warmup EKS cluster and try best to scale it to 8 cores at least",
+	Name:  "warmup",
+	Usage: "Warmup cluster and try best to scale it to 8 cores at least",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "kubeconfig",
@@ -55,12 +56,27 @@ var Command = cli.Command{
 			Usage: "Total requests per runner (There are 10 runners totally and runner's rate is 20)",
 			Value: 10000,
 		},
+		cli.StringFlag{
+			Name:  "vc-affinity",
+			Usage: "Deploy virtualnode's controller with a specific labels (FORMAT: KEY=VALUE[,VALUE])",
+			Value: "node.kubernetes.io/instance-type=Standard_D8s_v3,m4.2xlarge",
+		},
+		cli.StringFlag{
+			Name:  "rg-affinity",
+			Usage: "Deploy runner group with a specific labels (FORMAT: KEY=VALUE[,VALUE])",
+			Value: "node.kubernetes.io/instance-type=Standard_D16s_v3,m4.4xlarge",
+		},
+		cli.BoolFlag{
+			Name:   "eks",
+			Usage:  "Indicates the target kubernetes cluster is EKS",
+			Hidden: true,
+		},
 	},
 	Action: func(cliCtx *cli.Context) (retErr error) {
 		ctx := context.Background()
 
 		rgCfgFile, rgCfgFileDone, err := utils.NewLoadProfileFromEmbed(
-			"loadprofile/ekswarmup.yaml",
+			"loadprofile/warmup.yaml",
 			func(spec *types.RunnerGroupSpec) error {
 				reqs := cliCtx.Int("total")
 				if reqs < 0 {
@@ -72,8 +88,15 @@ var Command = cli.Command{
 					return fmt.Errorf("invalid rate value: %v", rate)
 				}
 
+				rgAffinity := cliCtx.String("rg-affinity")
+				affinityLabels, err := kperfcmdutils.KeyValuesMap([]string{rgAffinity})
+				if err != nil {
+					return fmt.Errorf("failed to parse %s affinity: %w", rgAffinity, err)
+				}
+
 				spec.Profile.Spec.Total = reqs
 				spec.Profile.Spec.Rate = rate
+				spec.NodeAffinity = affinityLabels
 
 				data, _ := yaml.Marshal(spec)
 				klog.V(2).InfoS("Load Profile", "config", string(data))
@@ -86,10 +109,14 @@ var Command = cli.Command{
 		defer func() { _ = rgCfgFileDone() }()
 
 		kubeCfgPath := cliCtx.String("kubeconfig")
+		isEKS := cliCtx.Bool("eks")
+		virtualNodeAffinity := cliCtx.String("vc-affinity")
 
-		perr := patchEKSDaemonsetWithoutToleration(ctx, kubeCfgPath)
-		if perr != nil {
-			return perr
+		if isEKS {
+			perr := patchEKSDaemonsetWithoutToleration(ctx, kubeCfgPath)
+			if perr != nil {
+				return perr
+			}
 		}
 
 		cores, ferr := utils.FetchAPIServerCores(ctx, kubeCfgPath)
@@ -102,7 +129,7 @@ var Command = cli.Command{
 			klog.V(0).ErrorS(ferr, "failed to fetch apiserver cores")
 		}
 
-		delNP, err := deployWarmupVirtualNodepool(ctx, kubeCfgPath)
+		delNP, err := deployWarmupVirtualNodepool(ctx, kubeCfgPath, isEKS, virtualNodeAffinity)
 		if err != nil {
 			return err
 		}
@@ -155,15 +182,22 @@ func isReady(cores map[string]int) bool {
 	return n >= 2
 }
 
-// deployWarmupVirtualNodepool deploys nodepool on m4.2xlarge nodes for warmup.
-func deployWarmupVirtualNodepool(ctx context.Context, kubeCfgPath string) (func() error, error) {
+// deployWarmupVirtualNodepool deploys virtual nodepool.
+func deployWarmupVirtualNodepool(ctx context.Context, kubeCfgPath string, isEKS bool, nodeAffinity string) (func() error, error) {
 	target := "warmup"
-	kr := utils.NewKperfRunner(kubeCfgPath, "")
 
 	klog.V(0).InfoS("Deploying virtual nodepool", "name", target)
-	sharedProviderID, err := utils.FetchNodeProviderIDByType(ctx, kubeCfgPath, utils.EKSIdleNodepoolInstanceType)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get placeholder providerID: %w", err)
+
+	kr := utils.NewKperfRunner(kubeCfgPath, "")
+
+	sharedProviderID := ""
+	var err error
+
+	if isEKS {
+		sharedProviderID, err = utils.FetchNodeProviderIDByType(ctx, kubeCfgPath, utils.EKSIdleNodepoolInstanceType)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get placeholder providerID: %w", err)
+		}
 	}
 
 	klog.V(0).InfoS("Trying to delete", "nodepool", target)
@@ -171,8 +205,7 @@ func deployWarmupVirtualNodepool(ctx context.Context, kubeCfgPath string) (func(
 		klog.V(0).ErrorS(err, "failed to delete", "nodepool", target)
 	}
 
-	err = kr.NewNodepool(ctx, 0, target, 100, 32, 96, 110,
-		"node.kubernetes.io/instance-type=m4.2xlarge", sharedProviderID)
+	err = kr.NewNodepool(ctx, 0, target, 100, 32, 96, 110, nodeAffinity, sharedProviderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nodepool %s: %w", target, err)
 	}
@@ -185,8 +218,9 @@ func deployWarmupVirtualNodepool(ctx context.Context, kubeCfgPath string) (func(
 // patchEKSDaemonsetWithoutToleration removes tolerations to avoid pod scheduled
 // to virtual nodes.
 func patchEKSDaemonsetWithoutToleration(ctx context.Context, kubeCfgPath string) error {
-	clientset := mustClientset(kubeCfgPath)
+	klog.V(0).Info("Trying to removes EKS Daemonset's tolerations to avoid pod scheduled to virtual nodes")
 
+	clientset := mustClientset(kubeCfgPath)
 	ds := clientset.AppsV1().DaemonSets("kube-system")
 	for _, dn := range []string{"aws-node", "kube-proxy"} {
 		d, err := ds.Get(ctx, dn, metav1.GetOptions{})

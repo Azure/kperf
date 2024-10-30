@@ -25,6 +25,3 @@ loadProfile:
           resource: events
           limit: 1000
         shares: 100 # chance 100 / (1000 + 100 + 100)
-nodeAffinity:
-  node.kubernetes.io/instance-type:
-    - m4.4xlarge

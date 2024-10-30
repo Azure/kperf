@@ -39,12 +39,6 @@ var (
 	// provider ID for all the virtual nodes so that EKS cloud provider
 	// won't delete our virtual nodes.
 	EKSIdleNodepoolInstanceType = "m4.large"
-
-	// EKSRunnerNodepoolInstanceType is the instance type of nodes for kperf
-	// runners.
-	//
-	// NOTE: This is default type. Please align it with ../manifests/loadprofile/ekswarmup.yaml.
-	EKSRunnerNodepoolInstanceType = "m4.4xlarge"
 )
 
 // RepeatJobWithPod repeats to deploy 3k pods.
