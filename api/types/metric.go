@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 package types
 
 // HTTP2ErrorStats is the report about http2 error during testing.

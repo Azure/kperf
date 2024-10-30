@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
 package types
 
 import apitypes "github.com/Azure/kperf/api/types"
