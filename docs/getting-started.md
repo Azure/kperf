@@ -9,7 +9,7 @@ to build kperf from source.
 
 The following build system dependencies are required:
 
-* Go 1.21.X or above
+* Go 1.22.X or above
 * Linux platform
 * GNU Make
 * Git
