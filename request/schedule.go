@@ -5,6 +5,7 @@ package request
 
 import (
 	"context"
+	"errors"
 	"io"
 	"math"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/Azure/kperf/api/types"
 	"github.com/Azure/kperf/metrics"
 
+	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -81,6 +83,26 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 					if err == nil {
 						defer respBody.Close()
 						bytes, err = io.Copy(io.Discard, respBody)
+
+						// Based on HTTP2 Spec Section 8.1 [1],
+						//
+						// A server can send a complete response prior to the client
+						// sending an entire request if the response does not depend
+						// on any portion of the request that has not been sent and
+						// received. When this is true, a server MAY request that the
+						// client abort transmission of a request without error by
+						// sending a RST_STREAM with an error code of NO_ERROR after
+						// sending a complete response (i.e., a frame with the END_STREAM
+						// flag). Clients MUST NOT discard responses as a result of receiving
+						// such a RST_STREAM, though clients can always discard responses
+						// at their discretion for other reasons.
+						//
+						// We should mark NO_ERROR as nil here.
+						//
+						// [1]: https://httpwg.org/specs/rfc7540.html#HttpSequence
+						if err != nil && isHTTP2StreamNoError(err) {
+							err = nil
+						}
 					}
 					latency := time.Since(start).Seconds()
 
@@ -118,4 +140,16 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 		Duration:      totalDuration,
 		Total:         spec.Total,
 	}, nil
+}
+
+// isHTTP2StreamNoError returns true if it's NO_ERROR.
+func isHTTP2StreamNoError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if streamErr, ok := err.(http2.StreamError); ok || errors.As(err, &streamErr) {
+		return streamErr.Code == http2.ErrCodeNo
+	}
+	return false
 }
