@@ -3,71 +3,43 @@
 
 package types
 
-// HTTP2ErrorStats is the report about http2 error during testing.
-type HTTP2ErrorStats struct {
-	// ConnectionErrors represents connection level errors.
-	ConnectionErrors map[string]int32 `json:"connectionErrors,omitempty"`
-	// StreamErrors represents stream level errors.
-	StreamErrors map[string]int32 `json:"streamErrors,omitempty"`
-}
+import "time"
 
-// NewHTTP2ErrorStats returns new instance of HTTP2ErrorStats.
-func NewHTTP2ErrorStats() *HTTP2ErrorStats {
-	return &HTTP2ErrorStats{
-		ConnectionErrors: make(map[string]int32, 10),
-		StreamErrors:     make(map[string]int32, 10),
-	}
-}
+// ResponseErrorType is error type of response.
+type ResponseErrorType string
 
-// ResponseErrorStats is the report about errors.
-type ResponseErrorStats struct {
-	// UnknownErrors is all unknown errors.
-	UnknownErrors []string `json:"unknownErrors"`
-	// NetErrors is to track errors from net.
-	NetErrors map[string]int32 `json:"netErrors"`
-	// ResponseCodes records request number grouped by response
-	// code between 400 and 600.
-	ResponseCodes map[int]int32 `json:"responseCodes"`
-	// HTTP2Errors records http2 related errors.
-	HTTP2Errors HTTP2ErrorStats `json:"http2Errors"`
-}
+const (
+	// ResponseErrorTypeUnknown indicates we don't have correct category for errors.
+	ResponseErrorTypeUnknown ResponseErrorType = "unknown"
+	// ResponseErrorTypeHTTP indicates that the response returns http code >= 400.
+	ResponseErrorTypeHTTP ResponseErrorType = "http"
+	// ResponseErrorTypeHTTP2Protocol indicates that error comes from http2 layer.
+	ResponseErrorTypeHTTP2Protocol ResponseErrorType = "http2-protocol"
+	// ResponseErrorTypeConnection indicates that error is related to connection.
+	// For instance, connection refused caused by server down.
+	ResponseErrorTypeConnection ResponseErrorType = "connection"
+)
 
-// NewResponseErrorStats returns empty ResponseErrorStats.
-func NewResponseErrorStats() *ResponseErrorStats {
-	return &ResponseErrorStats{
-		UnknownErrors: make([]string, 0, 1024),
-		NetErrors:     make(map[string]int32, 10),
-		ResponseCodes: map[int]int32{},
-		HTTP2Errors:   *NewHTTP2ErrorStats(),
-	}
-}
-
-// Copy clones self.
-func (r *ResponseErrorStats) Copy() ResponseErrorStats {
-	res := NewResponseErrorStats()
-
-	res.UnknownErrors = make([]string, len(r.UnknownErrors))
-	copy(res.UnknownErrors, r.UnknownErrors)
-	res.NetErrors = cloneMap(r.NetErrors)
-	res.ResponseCodes = cloneMap(r.ResponseCodes)
-	res.HTTP2Errors.ConnectionErrors = cloneMap(r.HTTP2Errors.ConnectionErrors)
-	res.HTTP2Errors.StreamErrors = cloneMap(r.HTTP2Errors.StreamErrors)
-	return *res
-}
-
-// Merge merges two ResponseErrorStats.
-func (r *ResponseErrorStats) Merge(from *ResponseErrorStats) {
-	r.UnknownErrors = append(r.UnknownErrors, from.UnknownErrors...)
-	mergeMap(r.NetErrors, from.NetErrors)
-	mergeMap(r.ResponseCodes, from.ResponseCodes)
-	mergeMap(r.HTTP2Errors.ConnectionErrors, from.HTTP2Errors.ConnectionErrors)
-	mergeMap(r.HTTP2Errors.StreamErrors, from.HTTP2Errors.StreamErrors)
+// ResponseError is the record about that error.
+type ResponseError struct {
+	// Timestamp indicates when this error was received.
+	Timestamp time.Time `json:"timestamp"`
+	// Duration records timespan in seconds.
+	Duration float64 `json:"duration"`
+	// Type indicates that category to which the error belongs.
+	Type ResponseErrorType `json:"type"`
+	// Code only works when Type is http.
+	Code int `json:"code,omitempty"`
+	// Message shows error message for this error.
+	//
+	// NOTE: When Type is http, this field will be empty.
+	Message string `json:"message,omitempty"`
 }
 
 // ResponseStats is the report about benchmark result.
 type ResponseStats struct {
-	// ErrorStats means summary of errors.
-	ErrorStats ResponseErrorStats
+	// Errors stores all the observed errors.
+	Errors []ResponseError
 	// LatenciesByURL stores all the observed latencies for each request.
 	LatenciesByURL map[string][]float64
 	// TotalReceivedBytes is total bytes read from apiserver.
@@ -79,8 +51,10 @@ type RunnerMetricReport struct {
 	Total int `json:"total"`
 	// Duration means the time of benchmark.
 	Duration string `json:"duration"`
-	// ErrorStats means summary of errors.
-	ErrorStats ResponseErrorStats `json:"errorStats"`
+	// Errors stores all the observed errors.
+	Errors []ResponseError `json:"errors,omitempty"`
+	// ErrorStats means summary of errors group by type.
+	ErrorStats map[string]int32 `json:"errorStats,omitempty"`
 	// TotalReceivedBytes is total bytes read from apiserver.
 	TotalReceivedBytes int64 `json:"totalReceivedBytes"`
 	// LatenciesByURL stores all the observed latencies.
@@ -94,17 +68,3 @@ type RunnerMetricReport struct {
 // TODO(weifu): build brand new struct for RunnerGroupsReport to include more
 // information, like how many runner groups, service account and flow control.
 type RunnerGroupsReport = RunnerMetricReport
-
-func mergeMap[K comparable, V int32](to, from map[K]V) {
-	for key, value := range from {
-		to[key] += value
-	}
-}
-
-func cloneMap[K comparable, V int32](src map[K]V) map[K]V {
-	res := map[K]V{}
-	for key, value := range src {
-		res[key] = value
-	}
-	return res
-}

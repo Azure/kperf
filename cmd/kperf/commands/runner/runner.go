@@ -192,7 +192,7 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 func printResponseStats(f *os.File, rawDataFlagIncluded bool, stats *request.Result) error {
 	output := types.RunnerMetricReport{
 		Total:              stats.Total,
-		ErrorStats:         stats.ErrorStats,
+		ErrorStats:         metrics.BuildErrorStatsGroupByType(stats.Errors),
 		Duration:           stats.Duration.String(),
 		TotalReceivedBytes: stats.TotalReceivedBytes,
 
@@ -215,6 +215,7 @@ func printResponseStats(f *os.File, rawDataFlagIncluded bool, stats *request.Res
 
 	if rawDataFlagIncluded {
 		output.LatenciesByURL = stats.LatenciesByURL
+		output.Errors = stats.Errors
 	}
 
 	encoder := json.NewEncoder(f)

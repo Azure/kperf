@@ -15,7 +15,6 @@ import (
 	"syscall"
 
 	"github.com/Azure/kperf/api/types"
-
 	"golang.org/x/net/http2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
@@ -38,6 +37,23 @@ func BuildPercentileLatencies(latencies []float64) [][2]float64 {
 			idx--
 		}
 		res[pi] = [2]float64{pv, latencies[idx]}
+	}
+	return res
+}
+
+// BuildErrorStatsGroupByType summaries total count for each type of errors.
+func BuildErrorStatsGroupByType(errors []types.ResponseError) map[string]int32 {
+	res := map[string]int32{}
+
+	for _, err := range errors {
+		var key string
+		switch err.Type {
+		case types.ResponseErrorTypeHTTP:
+			key = fmt.Sprintf("%s/%d", err.Type, err.Code)
+		default:
+			key = fmt.Sprintf("%s/%s", err.Type, err.Message)
+		}
+		res[key]++
 	}
 	return res
 }
@@ -95,82 +111,53 @@ func codeFromHTTP(err error) int {
 	}
 }
 
-// updateHTTP2ErrorStats updates stats if err is http2 error.
-func updateHTTP2ErrorStats(stats *types.ResponseErrorStats, err error) {
+// isHTTP2Error returns true if it's related to http2 error.
+func isHTTP2Error(err error) (string, bool) {
+	if err == nil {
+		return "", false
+	}
+
 	if connErr, ok := err.(http2.ConnectionError); ok || errors.As(err, &connErr) {
-		stats.HTTP2Errors.ConnectionErrors[(http2.ErrCode(connErr)).String()]++
-		return
+		return (http2.ErrCode(connErr)).String(), true
 	}
 
 	if streamErr, ok := err.(http2.StreamError); ok || errors.As(err, &streamErr) {
-		stats.HTTP2Errors.StreamErrors[streamErr.Code.String()]++
-		return
+		return streamErr.Code.String(), true
 	}
 
 	if connErr, ok := err.(http2.GoAwayError); ok || errors.As(err, &connErr) {
-		stats.HTTP2Errors.ConnectionErrors[fmt.Sprintf("http2: server sent GOAWAY and closed the connection; ErrCode=%v, debug=%q", connErr.ErrCode, connErr.DebugData)]++
-		return
+		return fmt.Sprintf("http2: server sent GOAWAY and closed the connection; ErrCode=%v, debug=%s",
+			connErr.ErrCode, connErr.DebugData), true
 	}
 
 	if strings.Contains(err.Error(), errHTTP2ClientConnectionLost.Error()) {
-		stats.HTTP2Errors.ConnectionErrors[errHTTP2ClientConnectionLost.Error()]++
+		return errHTTP2ClientConnectionLost.Error(), true
 	}
+	return "", false
 }
 
-// updateNetErrors updates stats if err is related net error.
-func updateNetErrors(stats *types.ResponseErrorStats, err error) {
+// isConnectionError returns true if it's related to connection error.
+func isConnectionError(err error) (string, bool) {
 	if err == nil {
-		return
+		return "", false
 	}
 
-	errInStr := err.Error()
 	switch {
 	case isTimeoutError(err):
-		stats.NetErrors[err.Error()]++
-	case errors.Is(err, io.ErrUnexpectedEOF):
-		stats.NetErrors[io.ErrUnexpectedEOF.Error()]++
+		return err.Error(), true
 	case isConnectionRefused(err):
-		stats.NetErrors[syscall.ECONNREFUSED.Error()]++
+		return syscall.ECONNREFUSED.Error(), true
 	case isConnectionResetByPeer(err):
-		stats.NetErrors[syscall.ECONNRESET.Error()]++
-	case strings.Contains(errInStr, errTLSHandshakeTimeout.Error()):
-		stats.NetErrors[errTLSHandshakeTimeout.Error()]++
+		return syscall.ECONNRESET.Error(), true
+	case errors.Is(err, io.ErrUnexpectedEOF):
+		return io.ErrUnexpectedEOF.Error(), true
+	case errors.Is(err, io.EOF):
+		return io.EOF.Error(), true
+	case strings.Contains(err.Error(), errTLSHandshakeTimeout.Error()):
+		return errTLSHandshakeTimeout.Error(), true
 	default:
-		// TODO(weifu): add more categories.
+		return "", false
 	}
-}
-
-// isHTTP2Error returns true if it's related to http2 error.
-func isHTTP2Error(err error) bool {
-	if err == nil {
-		return false
-	}
-
-	if connErr, ok := err.(http2.ConnectionError); ok || errors.As(err, &connErr) {
-		return true
-	}
-
-	if streamErr, ok := err.(http2.StreamError); ok || errors.As(err, &streamErr) {
-		return true
-	}
-
-	if connErr, ok := err.(http2.GoAwayError); ok || errors.As(err, &connErr) {
-		return true
-	}
-
-	if strings.Contains(err.Error(), errHTTP2ClientConnectionLost.Error()) {
-		return true
-	}
-	return false
-}
-
-// isNetRelatedError returns true if it's related to net error.
-func isNetRelatedError(err error) bool {
-	return err != nil && (isTimeoutError(err) ||
-		isConnectionRefused(err) ||
-		isConnectionResetByPeer(err) ||
-		errors.Is(err, io.ErrUnexpectedEOF) ||
-		strings.Contains(err.Error(), errTLSHandshakeTimeout.Error()))
 }
 
 // isTimeoutError returns true if it's related to golang standard library

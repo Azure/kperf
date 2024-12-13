@@ -10,6 +10,7 @@ import (
 	"io"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/Azure/kperf/api/types"
 
@@ -19,31 +20,99 @@ import (
 )
 
 func TestResponseMetric_ObserveFailure(t *testing.T) {
-	expectedStats := types.ResponseErrorStats{
-		UnknownErrors: []string{
-			"unknown",
+	observedAt := time.Now()
+	dur := 10 * time.Second
+
+	expectedErrors := []types.ResponseError{
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeHTTP,
+			Code:      429,
 		},
-		ResponseCodes: map[int]int32{
-			429: 1,
-			500: 1,
-			504: 1,
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeHTTP,
+			Code:      500,
 		},
-		NetErrors: map[string]int32{
-			"net/http: TLS handshake timeout": 2,
-			"connection reset by peer":        1,
-			"connection refused":              1,
-			"unexpected EOF":                  1,
-			"context deadline exceeded":       1,
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeHTTP,
+			Code:      504,
 		},
-		HTTP2Errors: types.HTTP2ErrorStats{
-			ConnectionErrors: map[string]int32{
-				"http2: client connection lost": 2,
-				"http2: server sent GOAWAY and closed the connection; ErrCode=NO_ERROR, debug=\"\"":       1,
-				"http2: server sent GOAWAY and closed the connection; ErrCode=PROTOCOL_ERROR, debug=\"\"": 1,
-			},
-			StreamErrors: map[string]int32{
-				"CONNECT_ERROR": 1,
-			},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeHTTP2Protocol,
+			Message:   "http2: server sent GOAWAY and closed the connection; ErrCode=NO_ERROR, debug=",
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeHTTP2Protocol,
+			Message:   "http2: server sent GOAWAY and closed the connection; ErrCode=PROTOCOL_ERROR, debug=",
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeHTTP2Protocol,
+			Message:   "http2: client connection lost",
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeHTTP2Protocol,
+			Message:   "http2: client connection lost",
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeHTTP2Protocol,
+			Message:   http2.ErrCode(10).String(),
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeConnection,
+			Message:   "net/http: TLS handshake timeout",
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeConnection,
+			Message:   "net/http: TLS handshake timeout",
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeConnection,
+			Message:   "context deadline exceeded",
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeConnection,
+			Message:   syscall.ECONNRESET.Error(),
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeConnection,
+			Message:   syscall.ECONNREFUSED.Error(),
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeConnection,
+			Message:   io.ErrUnexpectedEOF.Error(),
+		},
+		{
+			Timestamp: observedAt,
+			Duration:  dur.Seconds(),
+			Type:      types.ResponseErrorTypeUnknown,
+			Message:   "unknown",
 		},
 	}
 
@@ -82,8 +151,8 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 
 	m := NewResponseMetric()
 	for _, err := range errs {
-		m.ObserveFailure(err)
+		m.ObserveFailure(observedAt, dur.Seconds(), err)
 	}
-	stats := m.Gather().ErrorStats
-	assert.Equal(t, expectedStats, stats)
+	errors := m.Gather().Errors
+	assert.Equal(t, expectedErrors, errors)
 }

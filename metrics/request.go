@@ -7,6 +7,7 @@ import (
 	"container/list"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/Azure/kperf/api/types"
 )
@@ -16,7 +17,7 @@ type ResponseMetric interface {
 	// ObserveLatency observes latency.
 	ObserveLatency(url string, seconds float64)
 	// ObserveFailure observes failure response.
-	ObserveFailure(err error)
+	ObserveFailure(now time.Time, seconds float64, err error)
 	// ObserveReceivedBytes observes the bytes read from apiserver.
 	ObserveReceivedBytes(bytes int64)
 	// Gather returns the summary.
@@ -25,14 +26,14 @@ type ResponseMetric interface {
 
 type responseMetricImpl struct {
 	mu              sync.Mutex
-	errorStats      *types.ResponseErrorStats
+	errors          *list.List
 	receivedBytes   int64
 	latenciesByURLs map[string]*list.List
 }
 
 func NewResponseMetric() ResponseMetric {
 	return &responseMetricImpl{
-		errorStats:      types.NewResponseErrorStats(),
+		errors:          list.New(),
 		latenciesByURLs: map[string]*list.List{},
 	}
 }
@@ -51,7 +52,7 @@ func (m *responseMetricImpl) ObserveLatency(url string, seconds float64) {
 }
 
 // ObserveFailure implements ResponseMetric.
-func (m *responseMetricImpl) ObserveFailure(err error) {
+func (m *responseMetricImpl) ObserveFailure(now time.Time, seconds float64, err error) {
 	if err == nil {
 		return
 	}
@@ -59,18 +60,30 @@ func (m *responseMetricImpl) ObserveFailure(err error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// HTTP2 -> TCP/TLS -> Unknown
+	oerr := types.ResponseError{
+		Timestamp: now,
+		Duration:  seconds,
+	}
+
+	// HTTP Code -> HTTP2 -> Connection -> Unknown
 	code := codeFromHTTP(err)
+	http2Err, isHTTP2Err := isHTTP2Error(err)
+	connErr, isConnErr := isConnectionError(err)
 	switch {
 	case code != 0:
-		m.errorStats.ResponseCodes[code]++
-	case isHTTP2Error(err):
-		updateHTTP2ErrorStats(m.errorStats, err)
-	case isNetRelatedError(err):
-		updateNetErrors(m.errorStats, err)
+		oerr.Type = types.ResponseErrorTypeHTTP
+		oerr.Code = code
+	case isHTTP2Err:
+		oerr.Type = types.ResponseErrorTypeHTTP2Protocol
+		oerr.Message = http2Err
+	case isConnErr:
+		oerr.Type = types.ResponseErrorTypeConnection
+		oerr.Message = connErr
 	default:
-		m.errorStats.UnknownErrors = append(m.errorStats.UnknownErrors, err.Error())
+		oerr.Type = types.ResponseErrorTypeUnknown
+		oerr.Message = err.Error()
 	}
+	m.errors.PushBack(oerr)
 }
 
 // ObserveReceivedBytes implements ResponseMetric.
@@ -81,7 +94,7 @@ func (m *responseMetricImpl) ObserveReceivedBytes(bytes int64) {
 // Gather implements ResponseMetric.
 func (m *responseMetricImpl) Gather() types.ResponseStats {
 	return types.ResponseStats{
-		ErrorStats:         m.dumpErrorStats(),
+		Errors:             m.dumpErrors(),
 		LatenciesByURL:     m.dumpLatencies(),
 		TotalReceivedBytes: atomic.LoadInt64(&m.receivedBytes),
 	}
@@ -102,9 +115,13 @@ func (m *responseMetricImpl) dumpLatencies() map[string][]float64 {
 	return res
 }
 
-func (m *responseMetricImpl) dumpErrorStats() types.ResponseErrorStats {
+func (m *responseMetricImpl) dumpErrors() []types.ResponseError {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	return m.errorStats.Copy()
+	res := make([]types.ResponseError, 0, m.errors.Len())
+	for e := m.errors.Front(); e != nil; e = e.Next() {
+		res = append(res, e.Value.(types.ResponseError))
+	}
+	return res
 }

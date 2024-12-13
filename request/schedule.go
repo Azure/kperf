@@ -104,11 +104,12 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 							err = nil
 						}
 					}
-					latency := time.Since(start).Seconds()
+					end := time.Now()
+					latency := end.Sub(start).Seconds()
 
 					respMetric.ObserveReceivedBytes(bytes)
 					if err != nil {
-						respMetric.ObserveFailure(err)
+						respMetric.ObserveFailure(end, latency, err)
 						klog.V(5).Infof("Request stream failed: %v", err)
 						return
 					}

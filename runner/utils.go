@@ -63,7 +63,8 @@ func buildRunnerGroupSummary(s *localstore.Store, groups []*group.Handler) *type
 	totalBytes := int64(0)
 	totalResp := 0
 	latenciesByURL := map[string]*list.List{}
-	errStats := types.NewResponseErrorStats()
+	errs := []types.ResponseError{}
+	errStats := map[string]int32{}
 	maxDuration := 0 * time.Second
 
 	for idx := range groups {
@@ -107,7 +108,9 @@ func buildRunnerGroupSummary(s *localstore.Store, groups []*group.Handler) *type
 			}
 
 			// update error stats
-			errStats.Merge(&report.ErrorStats)
+			mergeErrorStat(errStats, report.ErrorStats)
+			errs = append(errs, report.Errors...)
+			report.Errors = nil
 
 			// update max duration
 			rDur, err := time.ParseDuration(report.Duration)
@@ -133,7 +136,8 @@ func buildRunnerGroupSummary(s *localstore.Store, groups []*group.Handler) *type
 
 	return &types.RunnerMetricReport{
 		Total:                    totalResp,
-		ErrorStats:               *errStats,
+		Errors:                   errs,
+		ErrorStats:               errStats,
 		Duration:                 maxDuration.String(),
 		TotalReceivedBytes:       totalBytes,
 		PercentileLatencies:      metrics.BuildPercentileLatencies(latencies),
@@ -148,6 +152,13 @@ func listToSliceFloat64(l *list.List) []float64 {
 		res = append(res, e.Value.(float64))
 	}
 	return res
+}
+
+// mergeErrorStat merges two error stats.
+func mergeErrorStat(s, d map[string]int32) {
+	for e, n := range d {
+		s[e] += n
+	}
 }
 
 // readBlob reads blob data from localstore.
