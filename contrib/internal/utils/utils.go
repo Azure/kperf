@@ -264,6 +264,14 @@ func DeployRunnerGroup(ctx context.Context,
 		// Using 1 min as timeout is to ensure we can get result in time.
 		data, err := kr.RGResult(ctx, 1*time.Minute)
 		if err != nil {
+			// FIXME(weifu): If the pod is not found, we should fast
+			// return. However, it's hard to maintain error string
+			// match. We should use specific commandline error code
+			// or use package instead of binary call.
+			if strings.Contains(err.Error(), `pods "runnergroup-server" not found`) {
+				return nil, err
+			}
+
 			klog.ErrorS(err, "failed to fetch runner group's result")
 			continue
 		}
