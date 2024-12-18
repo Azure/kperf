@@ -17,7 +17,7 @@ type ResponseMetric interface {
 	// ObserveLatency observes latency.
 	ObserveLatency(url string, seconds float64)
 	// ObserveFailure observes failure response.
-	ObserveFailure(now time.Time, seconds float64, err error)
+	ObserveFailure(url string, now time.Time, seconds float64, err error)
 	// ObserveReceivedBytes observes the bytes read from apiserver.
 	ObserveReceivedBytes(bytes int64)
 	// Gather returns the summary.
@@ -52,7 +52,7 @@ func (m *responseMetricImpl) ObserveLatency(url string, seconds float64) {
 }
 
 // ObserveFailure implements ResponseMetric.
-func (m *responseMetricImpl) ObserveFailure(now time.Time, seconds float64, err error) {
+func (m *responseMetricImpl) ObserveFailure(url string, now time.Time, seconds float64, err error) {
 	if err == nil {
 		return
 	}
@@ -61,6 +61,7 @@ func (m *responseMetricImpl) ObserveFailure(now time.Time, seconds float64, err 
 	defer m.mu.Unlock()
 
 	oerr := types.ResponseError{
+		URL:       url,
 		Timestamp: now,
 		Duration:  seconds,
 	}

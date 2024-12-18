@@ -22,6 +22,8 @@ const (
 
 // ResponseError is the record about that error.
 type ResponseError struct {
+	// URL indicates target resource.
+	URL string `json:"url"`
 	// Timestamp indicates when this error was received.
 	Timestamp time.Time `json:"timestamp"`
 	// Duration records timespan in seconds.
@@ -29,11 +31,11 @@ type ResponseError struct {
 	// Type indicates that category to which the error belongs.
 	Type ResponseErrorType `json:"type"`
 	// Code only works when Type is http.
-	Code int `json:"code,omitempty"`
+	Code int `json:"code"`
 	// Message shows error message for this error.
 	//
 	// NOTE: When Type is http, this field will be empty.
-	Message string `json:"message,omitempty"`
+	Message string `json:"message"`
 }
 
 // ResponseStats is the report about benchmark result.

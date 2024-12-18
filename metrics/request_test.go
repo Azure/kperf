@@ -25,90 +25,105 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 
 	expectedErrors := []types.ResponseError{
 		{
+			URL:       "0",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeHTTP,
 			Code:      429,
 		},
 		{
+			URL:       "1",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeHTTP,
 			Code:      500,
 		},
 		{
+			URL:       "2",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeHTTP,
 			Code:      504,
 		},
 		{
+			URL:       "3",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeHTTP2Protocol,
 			Message:   "http2: server sent GOAWAY and closed the connection; ErrCode=NO_ERROR, debug=",
 		},
 		{
+			URL:       "4",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeHTTP2Protocol,
 			Message:   "http2: server sent GOAWAY and closed the connection; ErrCode=PROTOCOL_ERROR, debug=",
 		},
 		{
+			URL:       "5",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeHTTP2Protocol,
 			Message:   "http2: client connection lost",
 		},
 		{
+			URL:       "6",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeHTTP2Protocol,
 			Message:   "http2: client connection lost",
 		},
 		{
+			URL:       "7",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeHTTP2Protocol,
 			Message:   http2.ErrCode(10).String(),
 		},
 		{
+			URL:       "8",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeConnection,
 			Message:   "net/http: TLS handshake timeout",
 		},
 		{
+			URL:       "9",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeConnection,
 			Message:   "net/http: TLS handshake timeout",
 		},
 		{
+			URL:       "10",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeConnection,
 			Message:   "context deadline exceeded",
 		},
 		{
+			URL:       "11",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeConnection,
 			Message:   syscall.ECONNRESET.Error(),
 		},
 		{
+			URL:       "12",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeConnection,
 			Message:   syscall.ECONNREFUSED.Error(),
 		},
 		{
+			URL:       "13",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeConnection,
 			Message:   io.ErrUnexpectedEOF.Error(),
 		},
 		{
+			URL:       "14",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
 			Type:      types.ResponseErrorTypeUnknown,
@@ -150,8 +165,8 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 	}
 
 	m := NewResponseMetric()
-	for _, err := range errs {
-		m.ObserveFailure(observedAt, dur.Seconds(), err)
+	for idx, err := range errs {
+		m.ObserveFailure(fmt.Sprintf("%d", idx), observedAt, dur.Seconds(), err)
 	}
 	errors := m.Gather().Errors
 	assert.Equal(t, expectedErrors, errors)
