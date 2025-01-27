@@ -156,15 +156,11 @@ func newRequestGetBuilder(src *types.RequestGet, resourceVersion string, maxRetr
 // Build implements RequestBuilder.Build.
 func (b *requestGetBuilder) Build(cli rest.Interface) (string, *rest.Request) {
 	// https://kubernetes.io/docs/reference/using-api/#api-groups
-	apiPath := "apis"
+	comps := make([]string, 0, 5)
 	if b.version.Group == "" {
-		apiPath = "api"
-	}
-
-	comps := make([]string, 2, 5)
-	comps[0], comps[1] = apiPath, b.version.Version
-	if b.namespace != "" {
-		comps = append(comps, "namespaces", b.namespace)
+		comps = append(comps, "api", b.version.Version)
+	} else {
+		comps = append(comps, "apis", b.version.Group, b.version.Version)
 	}
 	comps = append(comps, b.resource, b.name)
 
@@ -206,13 +202,12 @@ func newRequestListBuilder(src *types.RequestList, resourceVersion string, maxRe
 // Build implements RequestBuilder.Build.
 func (b *requestListBuilder) Build(cli rest.Interface) (string, *rest.Request) {
 	// https://kubernetes.io/docs/reference/using-api/#api-groups
-	apiPath := "apis"
+	comps := make([]string, 0, 5)
 	if b.version.Group == "" {
-		apiPath = "api"
+		comps = append(comps, "api", b.version.Version)
+	} else {
+		comps = append(comps, "apis", b.version.Group, b.version.Version)
 	}
-
-	comps := make([]string, 2, 5)
-	comps[0], comps[1] = apiPath, b.version.Version
 	if b.namespace != "" {
 		comps = append(comps, "namespaces", b.namespace)
 	}
