@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -106,8 +107,15 @@ func ApplyPriorityLevelConfiguration(kubeconfigPath string) error {
 		},
 	}
 
+	plcCli := clientset.FlowcontrolV1beta3().PriorityLevelConfigurations()
+
 	// Apply the PriorityLevelConfiguration
-	_, err = clientset.FlowcontrolV1beta3().PriorityLevelConfigurations().Create(context.TODO(), plc, metav1.CreateOptions{})
+	_, err = plcCli.Create(context.TODO(), plc, metav1.CreateOptions{})
+	if err != nil {
+		if apierrors.IsAlreadyExists(err) {
+			_, err = plcCli.Update(context.TODO(), plc, metav1.UpdateOptions{})
+		}
+	}
 	if err != nil {
 		return fmt.Errorf("failed to apply PriorityLevelConfiguration: %v", err)
 	}
