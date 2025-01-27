@@ -66,6 +66,11 @@ var Command = cli.Command{
 			Usage: "Deploy runner group with a specific labels (FORMAT: KEY=VALUE[,VALUE])",
 			Value: "node.kubernetes.io/instance-type=Standard_D16s_v3,m4.4xlarge,n1-standard-16",
 		},
+		cli.IntFlag{
+			Name:  "core-warmup-ready-threshold",
+			Usage: "Indicates the threshold for core during warm-up",
+			Value: 8,
+		},
 		cli.BoolFlag{
 			Name:   "eks",
 			Usage:  "Indicates the target kubernetes cluster is EKS",
@@ -121,7 +126,7 @@ var Command = cli.Command{
 
 		cores, ferr := utils.FetchAPIServerCores(ctx, kubeCfgPath)
 		if ferr == nil {
-			if isReady(cores) {
+			if isReady(cliCtx, cores) {
 				klog.V(0).Infof("apiserver resource is ready: %v", cores)
 				return nil
 			}
@@ -162,7 +167,7 @@ var Command = cli.Command{
 
 		cores, ferr = utils.FetchAPIServerCores(ctx, kubeCfgPath)
 		if ferr == nil {
-			if isReady(cores) {
+			if isReady(cliCtx, cores) {
 				klog.V(0).Infof("apiserver resource is ready: %v", cores)
 				return nil
 			}
@@ -172,14 +177,17 @@ var Command = cli.Command{
 }
 
 // isReady returns true if there are more than two instances using 8 cores.
-func isReady(cores map[string]int) bool {
+func isReady(cliCtx *cli.Context, cores map[string]int) bool {
+	target := cliCtx.Int("core-warmup-ready-threshold")
+	isEKS := cliCtx.Bool("eks")
+
 	n := 0
 	for _, c := range cores {
-		if c >= 8 {
+		if c >= target {
 			n++
 		}
 	}
-	return n >= 2
+	return (isEKS && n >= 2) || (!isEKS && n >= 1)
 }
 
 // deployWarmupVirtualNodepool deploys virtual nodepool.
