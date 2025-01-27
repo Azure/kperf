@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	flowcontrolv1beta3 "k8s.io/api/flowcontrol/v1beta3"
+	flowcontrolv1 "k8s.io/api/flowcontrol/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -83,21 +83,21 @@ func ApplyPriorityLevelConfiguration(kubeconfigPath string) error {
 
 	// Define the PriorityLevelConfiguration
 	lendablePercent := int32(30)
-	plc := &flowcontrolv1beta3.PriorityLevelConfiguration{
+	plc := &flowcontrolv1.PriorityLevelConfiguration{
 		TypeMeta: metav1.TypeMeta{
-			APIVersion: "flowcontrol.apiserver.k8s.io/v1beta3",
+			APIVersion: "flowcontrol.apiserver.k8s.io/v1",
 			Kind:       "PriorityLevelConfiguration",
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "custom-system",
 		},
-		Spec: flowcontrolv1beta3.PriorityLevelConfigurationSpec{
-			Type: flowcontrolv1beta3.PriorityLevelEnablementLimited,
-			Limited: &flowcontrolv1beta3.LimitedPriorityLevelConfiguration{
+		Spec: flowcontrolv1.PriorityLevelConfigurationSpec{
+			Type: flowcontrolv1.PriorityLevelEnablementLimited,
+			Limited: &flowcontrolv1.LimitedPriorityLevelConfiguration{
 				LendablePercent: &lendablePercent,
-				LimitResponse: flowcontrolv1beta3.LimitResponse{
-					Type: flowcontrolv1beta3.LimitResponseTypeQueue,
-					Queuing: &flowcontrolv1beta3.QueuingConfiguration{
+				LimitResponse: flowcontrolv1.LimitResponse{
+					Type: flowcontrolv1.LimitResponseTypeQueue,
+					Queuing: &flowcontrolv1.QueuingConfiguration{
 						Queues:           64,
 						HandSize:         6,
 						QueueLengthLimit: 50,
@@ -107,7 +107,7 @@ func ApplyPriorityLevelConfiguration(kubeconfigPath string) error {
 		},
 	}
 
-	plcCli := clientset.FlowcontrolV1beta3().PriorityLevelConfigurations()
+	plcCli := clientset.FlowcontrolV1().PriorityLevelConfigurations()
 
 	// Apply the PriorityLevelConfiguration
 	_, err = plcCli.Create(context.TODO(), plc, metav1.CreateOptions{})
