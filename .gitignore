@@ -29,3 +29,6 @@ tmp/
 
 #.txt files which contain response stats
 *.txt
+
+# VSCode settings
+.vscode/

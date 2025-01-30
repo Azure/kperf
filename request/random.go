@@ -231,12 +231,12 @@ func (b *requestListBuilder) Build(cli rest.Interface) Requester {
 				req: cli.Get().AbsPath(comps...).
 					SpecificallyVersionedParams(
 						&metav1.ListOptions{
-							LabelSelector:   b.labelSelector,
-							FieldSelector:   b.fieldSelector,
-							ResourceVersion: b.resourceVersion,
-							Limit:           b.limit,
-							Watch: 		 true,
-							SendInitialEvents: &b.sendInitialEvents,
+							LabelSelector:       b.labelSelector,
+							FieldSelector:       b.fieldSelector,
+							ResourceVersion:     b.resourceVersion,
+							Limit:               b.limit,
+							Watch:               true,
+							SendInitialEvents:   &b.sendInitialEvents,
 							AllowWatchBookmarks: true,
 						},
 						scheme.ParameterCodec,

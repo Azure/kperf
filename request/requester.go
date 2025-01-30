@@ -39,7 +39,7 @@ type DiscardRequester struct {
 }
 
 func (reqr *DiscardRequester) Do(ctx context.Context) (bytes int64, err error) {
-	respBody, err := reqr.req.Stream(context.Background())
+	respBody, err := reqr.req.Stream(ctx)
 	bytes = 0
 	if err == nil {
 		defer respBody.Close()
