@@ -45,9 +45,13 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 		var builder RESTRequestBuilder
 		switch {
 		case r.StaleList != nil:
-			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries)
+			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries, false)
 		case r.QuorumList != nil:
-			builder = newRequestListBuilder(r.QuorumList, "", spec.MaxRetries)
+			builder = newRequestListBuilder(r.QuorumList, "", spec.MaxRetries, false)
+		case r.StaleWatchList != nil:
+			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries, true)
+		case r.QuorumWatchList != nil:
+			builder = newRequestListBuilder(r.QuorumList, "", spec.MaxRetries, true)
 		case r.StaleGet != nil:
 			builder = newRequestGetBuilder(r.StaleGet, "0", spec.MaxRetries)
 		case r.QuorumGet != nil:
@@ -127,7 +131,7 @@ func (r *WeightedRandomRequests) Stop() {
 
 // RESTRequestBuilder is used to build rest.Request.
 type RESTRequestBuilder interface {
-	Build(cli rest.Interface) (method string, _ *rest.Request)
+	Build(cli rest.Interface) Requester
 }
 
 type requestGetBuilder struct {
@@ -154,7 +158,7 @@ func newRequestGetBuilder(src *types.RequestGet, resourceVersion string, maxRetr
 }
 
 // Build implements RequestBuilder.Build.
-func (b *requestGetBuilder) Build(cli rest.Interface) (string, *rest.Request) {
+func (b *requestGetBuilder) Build(cli rest.Interface) Requester {
 	// https://kubernetes.io/docs/reference/using-api/#api-groups
 	comps := make([]string, 0, 5)
 	if b.version.Group == "" {
@@ -164,43 +168,50 @@ func (b *requestGetBuilder) Build(cli rest.Interface) (string, *rest.Request) {
 	}
 	comps = append(comps, b.resource, b.name)
 
-	return "GET", cli.Get().AbsPath(comps...).
-		SpecificallyVersionedParams(
-			&metav1.GetOptions{ResourceVersion: b.resourceVersion},
-			scheme.ParameterCodec,
-			schema.GroupVersion{Version: "v1"},
-		).MaxRetries(b.maxRetries)
+	return &DiscardRequester{
+		BaseRequester: BaseRequester{
+			method: "GET",
+			req: cli.Get().AbsPath(comps...).
+				SpecificallyVersionedParams(
+					&metav1.GetOptions{ResourceVersion: b.resourceVersion},
+					scheme.ParameterCodec,
+					schema.GroupVersion{Version: "v1"},
+				).MaxRetries(b.maxRetries),
+		},
+	}
 }
 
 type requestListBuilder struct {
-	version         schema.GroupVersion
-	resource        string
-	namespace       string
-	limit           int64
-	labelSelector   string
-	fieldSelector   string
-	resourceVersion string
-	maxRetries      int
+	version           schema.GroupVersion
+	resource          string
+	namespace         string
+	limit             int64
+	labelSelector     string
+	fieldSelector     string
+	resourceVersion   string
+	maxRetries        int
+	sendInitialEvents bool
 }
 
-func newRequestListBuilder(src *types.RequestList, resourceVersion string, maxRetries int) *requestListBuilder {
+func newRequestListBuilder(src *types.RequestList, resourceVersion string, maxRetries int, sendInitialEvents bool) *requestListBuilder {
 	return &requestListBuilder{
 		version: schema.GroupVersion{
 			Group:   src.Group,
 			Version: src.Version,
 		},
-		resource:        src.Resource,
-		namespace:       src.Namespace,
-		limit:           int64(src.Limit),
-		labelSelector:   src.Selector,
-		fieldSelector:   src.FieldSelector,
-		resourceVersion: resourceVersion,
-		maxRetries:      maxRetries,
+		resource:          src.Resource,
+		namespace:         src.Namespace,
+		limit:             int64(src.Limit),
+		labelSelector:     src.Selector,
+		fieldSelector:     src.FieldSelector,
+		resourceVersion:   resourceVersion,
+		maxRetries:        maxRetries,
+		sendInitialEvents: sendInitialEvents,
 	}
 }
 
 // Build implements RequestBuilder.Build.
-func (b *requestListBuilder) Build(cli rest.Interface) (string, *rest.Request) {
+func (b *requestListBuilder) Build(cli rest.Interface) Requester {
 	// https://kubernetes.io/docs/reference/using-api/#api-groups
 	comps := make([]string, 0, 5)
 	if b.version.Group == "" {
@@ -213,17 +224,44 @@ func (b *requestListBuilder) Build(cli rest.Interface) (string, *rest.Request) {
 	}
 	comps = append(comps, b.resource)
 
-	return "LIST", cli.Get().AbsPath(comps...).
-		SpecificallyVersionedParams(
-			&metav1.ListOptions{
-				LabelSelector:   b.labelSelector,
-				FieldSelector:   b.fieldSelector,
-				ResourceVersion: b.resourceVersion,
-				Limit:           b.limit,
+	if b.sendInitialEvents {
+		return &WatchListRequester{
+			BaseRequester: BaseRequester{
+				method: "WATCHLIST",
+				req: cli.Get().AbsPath(comps...).
+					SpecificallyVersionedParams(
+						&metav1.ListOptions{
+							LabelSelector:   b.labelSelector,
+							FieldSelector:   b.fieldSelector,
+							ResourceVersion: b.resourceVersion,
+							Limit:           b.limit,
+							Watch: 		 true,
+							SendInitialEvents: &b.sendInitialEvents,
+							AllowWatchBookmarks: true,
+						},
+						scheme.ParameterCodec,
+						schema.GroupVersion{Version: "v1"},
+					).MaxRetries(b.maxRetries),
 			},
-			scheme.ParameterCodec,
-			schema.GroupVersion{Version: "v1"},
-		).MaxRetries(b.maxRetries)
+		}
+	}
+	return &DiscardRequester{
+		BaseRequester: BaseRequester{
+			method: "LIST",
+			req: cli.Get().AbsPath(comps...).
+				SpecificallyVersionedParams(
+					&metav1.ListOptions{
+						LabelSelector:   b.labelSelector,
+						FieldSelector:   b.fieldSelector,
+						ResourceVersion: b.resourceVersion,
+						Limit:           b.limit,
+					},
+					scheme.ParameterCodec,
+					schema.GroupVersion{Version: "v1"},
+				).MaxRetries(b.maxRetries),
+		},
+	}
+
 }
 
 type requestGetPodLogBuilder struct {
@@ -252,7 +290,7 @@ func newRequestGetPodLogBuilder(src *types.RequestGetPodLog, maxRetries int) *re
 }
 
 // Build implements RequestBuilder.Build.
-func (b *requestGetPodLogBuilder) Build(cli rest.Interface) (string, *rest.Request) {
+func (b *requestGetPodLogBuilder) Build(cli rest.Interface) Requester {
 	// https://kubernetes.io/docs/reference/using-api/#api-groups
 	apiPath, version := "api", "v1"
 
@@ -261,16 +299,21 @@ func (b *requestGetPodLogBuilder) Build(cli rest.Interface) (string, *rest.Reque
 	comps = append(comps, "namespaces", b.namespace)
 	comps = append(comps, "pods", b.name, "log")
 
-	return "POD_LOG", cli.Get().AbsPath(comps...).
-		SpecificallyVersionedParams(
-			&corev1.PodLogOptions{
-				Container:  b.container,
-				TailLines:  b.tailLines,
-				LimitBytes: b.limitBytes,
-			},
-			scheme.ParameterCodec,
-			schema.GroupVersion{Version: "v1"},
-		).MaxRetries(b.maxRetries)
+	return &DiscardRequester{
+		BaseRequester: BaseRequester{
+			method: "POD_LOG",
+			req: cli.Get().AbsPath(comps...).
+				SpecificallyVersionedParams(
+					&corev1.PodLogOptions{
+						Container:  b.container,
+						TailLines:  b.tailLines,
+						LimitBytes: b.limitBytes,
+					},
+					scheme.ParameterCodec,
+					schema.GroupVersion{Version: "v1"},
+				).MaxRetries(b.maxRetries),
+		},
+	}
 }
 
 func toPtr[T any](v T) *T {
