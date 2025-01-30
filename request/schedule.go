@@ -6,7 +6,6 @@ package request
 import (
 	"context"
 	"errors"
-	"io"
 	"math"
 	"sync"
 	"time"
@@ -80,7 +79,7 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 
 					var bytes int64
 					bytes, err := req.Do(context.Background())
-					
+
 					end := time.Now()
 					latency := end.Sub(start).Seconds()
 
