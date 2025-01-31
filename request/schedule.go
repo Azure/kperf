@@ -79,6 +79,25 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 
 					var bytes int64
 					bytes, err := req.Do(context.Background())
+					// Based on HTTP2 Spec Section 8.1 [1],
+					//
+					// A server can send a complete response prior to the client
+					// sending an entire request if the response does not depend
+					// on any portion of the request that has not been sent and
+					// received. When this is true, a server MAY request that the
+					// client abort transmission of a request without error by
+					// sending a RST_STREAM with an error code of NO_ERROR after
+					// sending a complete response (i.e., a frame with the END_STREAM
+					// flag). Clients MUST NOT discard responses as a result of receiving
+					// such a RST_STREAM, though clients can always discard responses
+					// at their discretion for other reasons.
+					//
+					// We should mark NO_ERROR as nil here.
+					//
+					// [1]: https://httpwg.org/specs/rfc7540.html#HttpSequence
+					if err != nil && isHTTP2StreamNoError(err) {
+						err = nil
+					}
 
 					end := time.Now()
 					latency := end.Sub(start).Seconds()
