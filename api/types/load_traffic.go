@@ -77,10 +77,8 @@ type WeightedRequest struct {
 	StaleList *RequestList `json:"staleList,omitempty" yaml:"staleList,omitempty"`
 	// QuorumList means this list request without kube-apiserver cache.
 	QuorumList *RequestList `json:"quorumList,omitempty" yaml:"quorumList,omitempty"`
-	// StaleWatchList means this list request with zero resource version, and it uses streaming list.
-	StaleWatchList *RequestList `json:"staleWatchList,omitempty" yaml:"staleWatchList,omitempty"`
-	// QuorumWatchList means this list request without kube-apiserver cache and it uses streaming list.
-	QuorumWatchList *RequestList `json:"quorumWatchList,omitempty" yaml:"quorumWatchList,omitempty"`
+	// WatchList lists objects with the watch list feature, a.k.a streaming list.
+	WatchList *RequestWatchList `json:"watchList,omitempty" yaml:"watchList,omitempty"`
 	// StaleGet means this get request with zero resource version.
 	StaleGet *RequestGet `json:"staleGet,omitempty" yaml:"staleGet,omitempty"`
 	// QuorumGet means this get request without kube-apiserver cache.
@@ -113,8 +111,17 @@ type RequestList struct {
 	Selector string `json:"seletor" yaml:"seletor"`
 	// FieldSelector defines how to identify a set of objects with field selector.
 	FieldSelector string `json:"fieldSelector" yaml:"fieldSelector"`
-	// Set SendInitialEvents to true if you want to use streaming list.
-	SendInitialEvents bool `json:"sendInitialEvents" yaml:"sendInitialEvents"`
+}
+
+type RequestWatchList struct {
+	// KubeGroupVersionResource identifies the resource URI.
+	KubeGroupVersionResource `yaml:",inline"`
+	// Namespace is object's namespace.
+	Namespace string `json:"namespace" yaml:"namespace"`
+	// Selector defines how to identify a set of objects.
+	Selector string `json:"selector" yaml:"selector"`
+	// FieldSelector defines how to identify a set of objects with field selector.
+	FieldSelector string `json:"fieldSelector" yaml:"fieldSelector"`
 }
 
 // RequestPut defines PUT request for target resource type.
@@ -204,10 +211,8 @@ func (r WeightedRequest) Validate() error {
 		return r.StaleList.Validate(true)
 	case r.QuorumList != nil:
 		return r.QuorumList.Validate(false)
-	case r.StaleWatchList != nil:
-		return r.StaleWatchList.Validate(true)
-	case r.QuorumWatchList != nil:
-		return r.QuorumWatchList.Validate(false)
+	case r.WatchList != nil:
+		return r.WatchList.Validate()
 	case r.StaleGet != nil:
 		return r.StaleGet.Validate()
 	case r.QuorumGet != nil:
@@ -233,6 +238,13 @@ func (r *RequestList) Validate(stale bool) error {
 
 	if stale && r.Limit != 0 {
 		return fmt.Errorf("stale list doesn't support pagination option: https://github.com/kubernetes/kubernetes/issues/108003")
+	}
+	return nil
+}
+
+func (r *RequestWatchList) Validate() error {
+	if err := r.KubeGroupVersionResource.Validate(); err != nil {
+		return fmt.Errorf("kube metadata: %v", err)
 	}
 	return nil
 }

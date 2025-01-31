@@ -68,7 +68,7 @@ spec:
       tailLines: 1000
       limitBytes: 1024
     shares: 10
-  - staleWatchList:
+  - watchList:
       group: core
       version: v1
       resource: pods
@@ -76,14 +76,6 @@ spec:
       seletor: app=x2
       fieldSelector: spec.nodeName=x
     shares: 250
-  - quorumWatchList:
-      group: core
-      version: v1
-      resource: configmaps
-      namespace: default
-      limit: 10000
-      seletor: app=x3
-    shares: 450
 `
 
 	target := LoadProfile{}
@@ -93,7 +85,7 @@ spec:
 	assert.Equal(t, float64(100), target.Spec.Rate)
 	assert.Equal(t, 10000, target.Spec.Total)
 	assert.Equal(t, 2, target.Spec.Conns)
-	assert.Len(t, target.Spec.Requests, 8)
+	assert.Len(t, target.Spec.Requests, 7)
 
 	assert.Equal(t, 100, target.Spec.Requests[0].Shares)
 	assert.NotNil(t, target.Spec.Requests[0].StaleGet)
@@ -138,10 +130,7 @@ spec:
 	assert.Equal(t, int64(1024), *target.Spec.Requests[5].GetPodLog.LimitBytes)
 
 	assert.Equal(t, 250, target.Spec.Requests[6].Shares)
-	assert.NotNil(t, target.Spec.Requests[6].StaleWatchList)
-
-	assert.Equal(t, 450, target.Spec.Requests[7].Shares)
-	assert.NotNil(t, target.Spec.Requests[7].QuorumWatchList)
+	assert.NotNil(t, target.Spec.Requests[6].WatchList)
 
 	assert.NoError(t, target.Validate())
 }

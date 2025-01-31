@@ -45,13 +45,11 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 		var builder RESTRequestBuilder
 		switch {
 		case r.StaleList != nil:
-			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries, false)
+			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries)
 		case r.QuorumList != nil:
-			builder = newRequestListBuilder(r.QuorumList, "", spec.MaxRetries, false)
-		case r.StaleWatchList != nil:
-			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries, true)
-		case r.QuorumWatchList != nil:
-			builder = newRequestListBuilder(r.QuorumList, "", spec.MaxRetries, true)
+			builder = newRequestListBuilder(r.QuorumList, "", spec.MaxRetries)
+		case r.WatchList != nil:
+			builder = newRequestWatchListBuilder(r.WatchList, spec.MaxRetries)
 		case r.StaleGet != nil:
 			builder = newRequestGetBuilder(r.StaleGet, "0", spec.MaxRetries)
 		case r.QuorumGet != nil:
@@ -182,31 +180,29 @@ func (b *requestGetBuilder) Build(cli rest.Interface) Requester {
 }
 
 type requestListBuilder struct {
-	version           schema.GroupVersion
-	resource          string
-	namespace         string
-	limit             int64
-	labelSelector     string
-	fieldSelector     string
-	resourceVersion   string
-	maxRetries        int
-	sendInitialEvents bool
+	version         schema.GroupVersion
+	resource        string
+	namespace       string
+	limit           int64
+	labelSelector   string
+	fieldSelector   string
+	resourceVersion string
+	maxRetries      int
 }
 
-func newRequestListBuilder(src *types.RequestList, resourceVersion string, maxRetries int, sendInitialEvents bool) *requestListBuilder {
+func newRequestListBuilder(src *types.RequestList, resourceVersion string, maxRetries int) *requestListBuilder {
 	return &requestListBuilder{
 		version: schema.GroupVersion{
 			Group:   src.Group,
 			Version: src.Version,
 		},
-		resource:          src.Resource,
-		namespace:         src.Namespace,
-		limit:             int64(src.Limit),
-		labelSelector:     src.Selector,
-		fieldSelector:     src.FieldSelector,
-		resourceVersion:   resourceVersion,
-		maxRetries:        maxRetries,
-		sendInitialEvents: sendInitialEvents,
+		resource:        src.Resource,
+		namespace:       src.Namespace,
+		limit:           int64(src.Limit),
+		labelSelector:   src.Selector,
+		fieldSelector:   src.FieldSelector,
+		resourceVersion: resourceVersion,
+		maxRetries:      maxRetries,
 	}
 }
 
@@ -224,27 +220,6 @@ func (b *requestListBuilder) Build(cli rest.Interface) Requester {
 	}
 	comps = append(comps, b.resource)
 
-	if b.sendInitialEvents {
-		return &WatchListRequester{
-			BaseRequester: BaseRequester{
-				method: "WATCHLIST",
-				req: cli.Get().AbsPath(comps...).
-					SpecificallyVersionedParams(
-						&metav1.ListOptions{
-							LabelSelector:       b.labelSelector,
-							FieldSelector:       b.fieldSelector,
-							ResourceVersion:     b.resourceVersion,
-							Limit:               b.limit,
-							Watch:               true,
-							SendInitialEvents:   &b.sendInitialEvents,
-							AllowWatchBookmarks: true,
-						},
-						scheme.ParameterCodec,
-						schema.GroupVersion{Version: "v1"},
-					).MaxRetries(b.maxRetries),
-			},
-		}
-	}
 	return &DiscardRequester{
 		BaseRequester: BaseRequester{
 			method: "LIST",
@@ -261,7 +236,63 @@ func (b *requestListBuilder) Build(cli rest.Interface) Requester {
 				).MaxRetries(b.maxRetries),
 		},
 	}
+}
 
+type requestWatchListBuilder struct {
+	version       schema.GroupVersion
+	resource      string
+	namespace     string
+	labelSelector string
+	fieldSelector string
+	maxRetries    int
+}
+
+func newRequestWatchListBuilder(src *types.RequestWatchList, maxRetries int) *requestWatchListBuilder {
+	return &requestWatchListBuilder{
+		version: schema.GroupVersion{
+			Group:   src.Group,
+			Version: src.Version,
+		},
+		resource:      src.Resource,
+		namespace:     src.Namespace,
+		labelSelector: src.Selector,
+		fieldSelector: src.FieldSelector,
+		maxRetries:    maxRetries,
+	}
+}
+
+// Build implements RequestBuilder.Build.
+func (b *requestWatchListBuilder) Build(cli rest.Interface) Requester {
+	// https://kubernetes.io/docs/reference/using-api/#api-groups
+	comps := make([]string, 0, 5)
+	if b.version.Group == "" {
+		comps = append(comps, "api", b.version.Version)
+	} else {
+		comps = append(comps, "apis", b.version.Group, b.version.Version)
+	}
+	if b.namespace != "" {
+		comps = append(comps, "namespaces", b.namespace)
+	}
+	comps = append(comps, b.resource)
+
+	return &WatchListRequester{
+		BaseRequester: BaseRequester{
+			method: "WATCHLIST",
+			req: cli.Get().AbsPath(comps...).
+				SpecificallyVersionedParams(
+					&metav1.ListOptions{
+						LabelSelector:       b.labelSelector,
+						FieldSelector:       b.fieldSelector,
+						ResourceVersion:     "",
+						Watch:               true,
+						SendInitialEvents:   toPtr(true),
+						AllowWatchBookmarks: true,
+					},
+					scheme.ParameterCodec,
+					schema.GroupVersion{Version: "v1"},
+				).MaxRetries(b.maxRetries),
+		},
+	}
 }
 
 type requestGetPodLogBuilder struct {
