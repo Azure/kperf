@@ -11,11 +11,11 @@ import (
 	"time"
 
 	internaltypes "github.com/Azure/kperf/contrib/internal/types"
-	"github.com/Azure/kperf/contrib/internal/utils"
+	"github.com/Azure/kperf/contrib/log"
+	"github.com/Azure/kperf/contrib/utils"
 
 	"github.com/urfave/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 )
 
 var benchNode100DeploymentNPod10KCase = cli.Command{
@@ -90,7 +90,10 @@ func benchNode100DeploymentNPod10KRun(cliCtx *cli.Context) (*internaltypes.Bench
 	wg.Add(1)
 
 	restartInterval := cliCtx.Duration("interval")
-	klog.V(0).Infof("The interval is %v for restaring deployments", restartInterval)
+
+	log.GetLogger(dpCtx).
+		WithKeyValues("level", "info").
+		LogKV("msg", fmt.Sprintf("the interval is %v for restaring deployments", restartInterval))
 
 	paddingBytes := cliCtx.Int("padding-bytes")
 	total := cliCtx.Int("deployments")
@@ -160,7 +163,9 @@ Workload: Deploy %d deployments with %d pods. Rolling-update deployments one by 
 
 // dumpDeploymentReplicas dumps deployment's replica.
 func dumpDeploymentReplicas(ctx context.Context, kubeCfgPath string, namePattern string, total int) error {
-	klog.V(0).Info("Dump deployment's replica information")
+	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
+
+	infoLogger.LogKV("msg", "dump deployment's replica information")
 
 	cli, err := utils.BuildClientset(kubeCfgPath)
 	if err != nil {
@@ -177,7 +182,8 @@ func dumpDeploymentReplicas(ctx context.Context, kubeCfgPath string, namePattern
 				name, ns, err)
 		}
 
-		klog.V(0).InfoS("Deployment", "name", name, "ns", ns,
+		infoLogger.LogKV("msg", "dump Deployment status",
+			"name", name, "ns", ns,
 			"replica", *dp.Spec.Replicas, "readyReplicas", dp.Status.ReadyReplicas)
 	}
 	return nil
@@ -188,7 +194,9 @@ func getDeploymentPodSize(ctx context.Context, kubeCfgPath string, namePattern s
 	ns := fmt.Sprintf("%s-0", namePattern)
 	labelSelector := fmt.Sprintf("app=%s", namePattern)
 
-	klog.V(0).InfoS("Get the size of pod", "labelSelector", labelSelector, "namespace", ns)
+	log.GetLogger(ctx).
+		WithKeyValues("level", "info").
+		LogKV("msg", "get the size of pod", "labelSelector", labelSelector, "namespace", ns)
 
 	cli, err := utils.BuildClientset(kubeCfgPath)
 	if err != nil {

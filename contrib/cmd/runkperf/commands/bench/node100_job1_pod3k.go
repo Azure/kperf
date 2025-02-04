@@ -10,7 +10,7 @@ import (
 	"time"
 
 	internaltypes "github.com/Azure/kperf/contrib/internal/types"
-	"github.com/Azure/kperf/contrib/internal/utils"
+	"github.com/Azure/kperf/contrib/utils"
 
 	"github.com/urfave/cli"
 )

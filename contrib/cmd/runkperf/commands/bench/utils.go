@@ -13,11 +13,11 @@ import (
 	"github.com/Azure/kperf/api/types"
 	kperfcmdutils "github.com/Azure/kperf/cmd/kperf/commands/utils"
 	internaltypes "github.com/Azure/kperf/contrib/internal/types"
-	"github.com/Azure/kperf/contrib/internal/utils"
+	"github.com/Azure/kperf/contrib/log"
+	"github.com/Azure/kperf/contrib/utils"
 
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
-	"k8s.io/klog/v2"
 )
 
 // subcmdActionFunc is to unify each subcommand's interface. They should return
@@ -32,7 +32,9 @@ func addAPIServerCoresInfoInterceptor(handler subcmdActionFunc) subcmdActionFunc
 
 		beforeCores, ferr := utils.FetchAPIServerCores(ctx, kubeCfgPath)
 		if ferr != nil {
-			klog.ErrorS(ferr, "failed to fetch apiserver cores")
+			log.GetLogger(ctx).
+				WithKeyValues("level", "warn").
+				LogKV("msg", "failed to fetch apiserver cores", "error", ferr)
 		}
 
 		report, err := handler(cliCtx)
@@ -42,7 +44,9 @@ func addAPIServerCoresInfoInterceptor(handler subcmdActionFunc) subcmdActionFunc
 
 		afterCores, ferr := utils.FetchAPIServerCores(ctx, kubeCfgPath)
 		if ferr != nil {
-			klog.ErrorS(ferr, "failed to fetch apiserver cores")
+			log.GetLogger(ctx).
+				WithKeyValues("level", "warn").
+				LogKV("msg", "failed to fetch apiserver cores", "error", ferr)
 		}
 
 		report.Info["apiserver"] = map[string]interface{}{
@@ -94,7 +98,9 @@ func renderBenchmarkReportInterceptor(handler subcmdActionFunc) subcmdActionFunc
 
 // deployVirtualNodepool deploys virtual nodepool.
 func deployVirtualNodepool(ctx context.Context, cliCtx *cli.Context, target string, nodes, cpu, memory, maxPods int) (func() error, error) {
-	klog.V(0).InfoS("Deploying virtual nodepool", "name", target)
+	log.GetLogger(ctx).
+		WithKeyValues("level", "info").
+		LogKV("msg", "deploying virtual nodepool", "name", target)
 
 	kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 	virtualNodeAffinity := cliCtx.GlobalString("vc-affinity")
@@ -112,9 +118,13 @@ func deployVirtualNodepool(ctx context.Context, cliCtx *cli.Context, target stri
 		}
 	}
 
-	klog.V(0).InfoS("Trying to delete nodepool if necessary", "name", target)
+	log.GetLogger(ctx).
+		WithKeyValues("level", "info").
+		LogKV("msg", "trying to delete nodepool if necessary", "name", target)
 	if err = kr.DeleteNodepool(ctx, 0, target); err != nil {
-		klog.V(0).ErrorS(err, "failed to delete nodepool", "name", target)
+		log.GetLogger(ctx).
+			WithKeyValues("level", "warn").
+			LogKV("msg", "failed to delete nodepool", "name", target, "error", err)
 	}
 
 	err = kr.NewNodepool(ctx, 0, target, nodes, cpu, memory, maxPods, virtualNodeAffinity, sharedProviderID)
@@ -127,11 +137,13 @@ func deployVirtualNodepool(ctx context.Context, cliCtx *cli.Context, target stri
 	}, nil
 }
 
+func NewRunnerGroupSpecFromYamlFile() {}
+
 // newLoadProfileFromEmbed loads load profile from embed and tweaks that load
 // profile.
 func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _spec *types.RunnerGroupSpec, _cleanup func() error, _err error) {
 	var rgSpec types.RunnerGroupSpec
-	rgCfgFile, rgCfgFileDone, err := utils.NewLoadProfileFromEmbed(
+	rgCfgFile, rgCfgFileDone, err := utils.NewRunnerGroupSpecFileFromEmbed(
 		name,
 		func(spec *types.RunnerGroupSpec) error {
 			reqs := cliCtx.Int("total")
@@ -151,7 +163,10 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 			spec.NodeAffinity = affinityLabels
 			spec.Profile.Spec.ContentType = types.ContentType(cliCtx.String("content-type"))
 			data, _ := yaml.Marshal(spec)
-			klog.V(2).InfoS("Load Profile", "config", string(data))
+
+			log.GetLogger(context.TODO()).
+				WithKeyValues("level", "info").
+				LogKV("msg", "dump load profile", "config", string(data))
 
 			rgSpec = *spec
 			return nil

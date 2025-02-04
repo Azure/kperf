@@ -19,13 +19,13 @@ import (
 
 	"github.com/Azure/kperf/api/types"
 	"github.com/Azure/kperf/contrib/internal/manifests"
+	"github.com/Azure/kperf/contrib/log"
 	"github.com/Azure/kperf/helmcli"
 
 	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -43,7 +43,10 @@ var (
 
 // RepeatJobWithPod repeats to deploy 3k pods.
 func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string, target string, internal time.Duration) {
-	klog.V(0).Info("Repeat to create job with 3k pods")
+	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
+	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
+
+	infoLogger.LogKV("msg", "repeat to create job with 3k pods")
 
 	data, err := manifests.FS.ReadFile(target)
 	if err != nil {
@@ -59,17 +62,17 @@ func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string,
 
 	kr := NewKubectlRunner(kubeCfgPath, namespace)
 
-	klog.V(0).Infof("Creating namespace %s", namespace)
+	infoLogger.LogKV("msg", "creating namespace", "name", namespace)
 	err = kr.CreateNamespace(ctx, 5*time.Minute, namespace)
 	if err != nil {
 		panic(fmt.Errorf("failed to create a new namespace %s: %v", namespace, err))
 	}
 
 	defer func() {
-		klog.V(0).Infof("Cleanup namespace %s", namespace)
+		infoLogger.LogKV("msg", "cleanup namespace", "name", namespace)
 		err := kr.DeleteNamespace(context.TODO(), 60*time.Minute, namespace)
 		if err != nil {
-			klog.V(0).ErrorS(err, "failed to cleanup", "namespace", namespace)
+			warnLogger.LogKV("msg", "failed to cleanup namespace", "name", namespace, "error", err)
 		}
 	}()
 
@@ -77,7 +80,7 @@ func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string,
 	for {
 		select {
 		case <-ctx.Done():
-			klog.V(0).Info("Stop creating job")
+			infoLogger.LogKV("msg", "stop creating job")
 			return
 		default:
 		}
@@ -86,18 +89,18 @@ func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string,
 
 		aerr := kr.Apply(ctx, 5*time.Minute, jobFile)
 		if aerr != nil {
-			klog.V(0).ErrorS(aerr, "failed to apply, retry after 5 seconds", "job", target)
+			warnLogger.LogKV("msg", "failed to apply job, retry after 5 seconds", "job", target, "error", aerr)
 			continue
 		}
 
 		werr := kr.Wait(ctx, 15*time.Minute, "condition=complete", "15m", "job/batchjobs")
 		if werr != nil {
-			klog.V(0).ErrorS(werr, "failed to wait", "job", target)
+			warnLogger.LogKV("msg", "failed to wait job finish", "job", target, "error", werr)
 		}
 
 		derr := kr.Delete(ctx, 5*time.Minute, jobFile)
 		if derr != nil {
-			klog.V(0).ErrorS(derr, "failed to delete", "job", target)
+			warnLogger.LogKV("msg", "failed to delete job", "job", target, "error", derr)
 		}
 		time.Sleep(internal)
 	}
@@ -111,6 +114,8 @@ func DeployAndRepeatRollingUpdateDeployments(
 	total, replica, paddingBytes int,
 	internal time.Duration,
 ) (rollingUpdateFn, cleanupFn func(), retErr error) {
+	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
+	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
 
 	target := "workload/deployments"
 	ch, err := manifests.LoadChart(target)
@@ -139,26 +144,30 @@ func DeployAndRepeatRollingUpdateDeployments(
 		return nil, nil, fmt.Errorf("failed to create a new helm release cli: %w", err)
 	}
 
-	klog.V(0).InfoS("Deploying deployments",
+	infoLogger.LogKV(
+		"msg", "deploying deployments",
 		"total", total,
 		"replica", replica,
 		"paddingBytes", paddingBytes,
 	)
+
 	err = releaseCli.Deploy(ctx, 10*time.Minute)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			klog.V(0).Info("Deploy is canceled")
+			infoLogger.LogKV("msg", "deploy is canceled")
 			return func() {}, func() {}, nil
 		}
 		return nil, nil, fmt.Errorf("failed to deploy helm chart %s: %w", target, err)
 	}
-	klog.V(0).InfoS("Deployed deployments")
+	infoLogger.LogKV("msg", "deployed deployments")
 
 	cleanupFn = func() {
-		klog.V(0).Infof("Cleanup helm chart %s", target)
+		infoLogger.LogKV("msg", "cleanup helm chart", "target", target)
 		err := releaseCli.Uninstall()
 		if err != nil {
-			klog.V(0).ErrorS(err, "failed to cleanup", "chart", target)
+			warnLogger.LogKV("msg", "failed to cleanup helm chart",
+				"target", target,
+				"error", err)
 		}
 	}
 
@@ -166,17 +175,17 @@ func DeployAndRepeatRollingUpdateDeployments(
 		for {
 			select {
 			case <-ctx.Done():
-				klog.V(0).Info("Stop rolling-updating")
+				infoLogger.LogKV("msg", "stop rolling-updating")
 				return
 			case <-time.After(internal):
 			}
 
-			klog.V(0).Info("Start to rolling-update deployments")
+			infoLogger.LogKV("msg", "start to rolling-update deployments")
 			for i := 0; i < total; i++ {
 				name := fmt.Sprintf("%s-%d", namePattern, i)
 				ns := name
 
-				klog.V(0).InfoS("Rolling-update", "deployment", name, "namespace", ns)
+				infoLogger.LogKV("msg", "rolling-update deployment", "name", name, "namespace", ns)
 				err := func() error {
 					kr := NewKubectlRunner(kubeCfgPath, ns)
 
@@ -192,8 +201,10 @@ func DeployAndRepeatRollingUpdateDeployments(
 					return nil
 				}()
 				if err != nil {
-					klog.V(0).ErrorS(err, "failed to rolling-update",
-						"deployment", name, "namespace", ns)
+					warnLogger.LogKV("msg", "failed to rolling-update",
+						"error", err,
+						"deployment", name,
+						"namespace", ns)
 				}
 			}
 		}
@@ -201,8 +212,27 @@ func DeployAndRepeatRollingUpdateDeployments(
 	return rollingUpdateFn, cleanupFn, nil
 }
 
-// NewLoadProfileFromEmbed reads load profile from embed memory.
-func NewLoadProfileFromEmbed(target string, tweakFn func(*types.RunnerGroupSpec) error) (_name string, _cleanup func() error, _ error) {
+// NewRunnerGroupSpecFromYAML returns RunnerGroupSpec instance from yaml data.
+func NewRunnerGroupSpecFromYAML(data []byte, tweakFn func(*types.RunnerGroupSpec) error) (*types.RunnerGroupSpec, error) {
+	var spec types.RunnerGroupSpec
+
+	if err := yaml.Unmarshal(data, &spec); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal into RunnerGroupSpec:\n (data: %s)\n: %w",
+			string(data), err)
+	}
+
+	if tweakFn != nil {
+		if err := tweakFn(&spec); err != nil {
+			return nil, fmt.Errorf("failed to tweak RunnerGroupSpec: %w", err)
+		}
+	}
+	return &spec, nil
+}
+
+// NewRunnerGroupSpecFileFromEmbed reads load profile (RunnerGroupSpec) from
+// embed memory and marshals it into temporary file. Use it when invoking
+// kperf binary instead of package.
+func NewRunnerGroupSpecFileFromEmbed(target string, tweakFn func(*types.RunnerGroupSpec) error) (_name string, _cleanup func() error, _ error) {
 	data, err := manifests.FS.ReadFile(target)
 	if err != nil {
 		return "", nil, fmt.Errorf("unexpected error when read %s from embed memory: %v", target, err)
@@ -211,7 +241,7 @@ func NewLoadProfileFromEmbed(target string, tweakFn func(*types.RunnerGroupSpec)
 	if tweakFn != nil {
 		var spec types.RunnerGroupSpec
 		if err = yaml.Unmarshal(data, &spec); err != nil {
-			return "", nil, fmt.Errorf("failed to unmarshal into runner group spec:\n (data: %s)\n: %w",
+			return "", nil, fmt.Errorf("failed to unmarshal into RunnerGroupSpec:\n (data: %s)\n: %w",
 				string(data), err)
 		}
 
@@ -221,10 +251,9 @@ func NewLoadProfileFromEmbed(target string, tweakFn func(*types.RunnerGroupSpec)
 
 		data, err = yaml.Marshal(spec)
 		if err != nil {
-			return "", nil, fmt.Errorf("failed to marshal runner group spec after tweak: %w", err)
+			return "", nil, fmt.Errorf("failed to marshal RunnerGroupSpec after tweak: %w", err)
 		}
 	}
-
 	return CreateTempFileWithContent(data)
 }
 
@@ -233,22 +262,24 @@ func DeployRunnerGroup(ctx context.Context,
 	kubeCfgPath, runnerImage, rgCfgFile string,
 	runnerFlowControl, runnerGroupAffinity string) (*types.RunnerGroupsReport, error) {
 
-	klog.InfoS("Deploying runner group", "config", rgCfgFile)
+	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
+	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
 
 	kr := NewKperfRunner(kubeCfgPath, runnerImage)
 
-	klog.Info("Deleting existing runner group")
+	infoLogger.LogKV("msg", "deleting existing runner group")
 	derr := kr.RGDelete(ctx, 0)
 	if derr != nil {
-		klog.ErrorS(derr, "failed to delete existing runner group")
+		return nil, fmt.Errorf("failed to delete existing runner group: %w", derr)
 	}
 
+	infoLogger.LogKV("msg", "deploying runner group")
 	rerr := kr.RGRun(ctx, 0, rgCfgFile, runnerFlowControl, runnerGroupAffinity)
 	if rerr != nil {
 		return nil, fmt.Errorf("failed to deploy runner group: %w", rerr)
 	}
 
-	klog.Info("Waiting runner group")
+	infoLogger.LogKV("msg", "start to wait runner group")
 	for {
 		select {
 		case <-ctx.Done():
@@ -272,19 +303,20 @@ func DeployRunnerGroup(ctx context.Context,
 				return nil, err
 			}
 
-			klog.ErrorS(err, "failed to fetch runner group's result")
+			warnLogger.LogKV("msg", fmt.Errorf("failed to fetch runner group's result: %w", err))
 			continue
 		}
-		klog.InfoS("Runner group's result", "data", data)
+
+		infoLogger.LogKV("msg", "dump RunnerGroupsReport", "data", data)
 
 		var rgResult types.RunnerGroupsReport
 		if err = json.Unmarshal([]byte(data), &rgResult); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal into RunnerGroupsReport: %w", err)
 		}
 
-		klog.Info("Deleting runner group")
+		infoLogger.LogKV("msg", "deleting runner group")
 		if derr := kr.RGDelete(ctx, 0); derr != nil {
-			klog.ErrorS(err, "failed to delete runner group")
+			warnLogger.LogKV("msg", "failed to delete runner group", "err", err)
 		}
 		return &rgResult, nil
 	}
@@ -292,7 +324,9 @@ func DeployRunnerGroup(ctx context.Context,
 
 // FetchAPIServerCores fetchs core number for each kube-apiserver.
 func FetchAPIServerCores(ctx context.Context, kubeCfgPath string) (map[string]int, error) {
-	klog.V(0).Info("Fetching apiserver's cores")
+	logger := log.GetLogger(ctx)
+
+	logger.WithKeyValues("level", "info").LogKV("msg", "fetching apiserver's cores")
 
 	kr := NewKubectlRunner(kubeCfgPath, "")
 	fqdn, err := kr.FQDN(ctx, 0)
@@ -327,10 +361,10 @@ func FetchAPIServerCores(ctx context.Context, kubeCfgPath string) (map[string]in
 			return 0, fmt.Errorf("failed to get go_sched_gomaxprocs_threads")
 		}()
 		if err != nil {
-			klog.V(0).ErrorS(err, "failed to get cores", "ip", ip)
+			logger.WithKeyValues("level", "warn").LogKV("msg", "failed to get cores", "ip", ip, "error", err)
 			continue
 		}
-		klog.V(0).InfoS("apiserver cores", ip, cores)
+		logger.LogKV(ip, cores)
 		res[ip] = cores
 	}
 	return res, nil
@@ -384,6 +418,8 @@ func NSLookup(domainURL string) ([]string, error) {
 
 // runCommand runs command with Pdeathsig.
 func runCommand(ctx context.Context, timeout time.Duration, cmd string, args []string) ([]byte, error) {
+	logger := log.GetLogger(ctx)
+
 	var cancel context.CancelFunc
 	if timeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -393,7 +429,7 @@ func runCommand(ctx context.Context, timeout time.Duration, cmd string, args []s
 	c := exec.CommandContext(ctx, cmd, args...)
 	c.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
 
-	klog.V(2).Infof("[CMD] %s", c.String())
+	logger.WithKeyValues("level", "info").LogKV("msg", "start command", "cmd", c.String())
 	output, err := c.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to invoke %s:\n (output: %s): %w",
@@ -404,6 +440,8 @@ func runCommand(ctx context.Context, timeout time.Duration, cmd string, args []s
 
 // runCommandWithInput executes a command with `input` piped through stdin.
 func runCommandWithInput(ctx context.Context, timeout time.Duration, cmd string, args []string, input string) ([]byte, error) {
+	logger := log.GetLogger(ctx)
+
 	var cancel context.CancelFunc
 	if timeout != 0 {
 		ctx, cancel = context.WithTimeout(ctx, timeout)
@@ -414,7 +452,7 @@ func runCommandWithInput(ctx context.Context, timeout time.Duration, cmd string,
 	c.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
 	c.Stdin = strings.NewReader(input)
 
-	klog.V(2).Infof("[CMD] %s", c.String())
+	logger.WithKeyValues("level", "info").LogKV("msg", "start command", "cmd", c.String())
 	output, err := c.CombinedOutput()
 	if err != nil {
 		return nil, fmt.Errorf("failed to invoke %s:\n (output: %s): %w",

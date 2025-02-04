@@ -11,7 +11,8 @@ import (
 
 	"github.com/Azure/kperf/api/types"
 	kperfcmdutils "github.com/Azure/kperf/cmd/kperf/commands/utils"
-	"github.com/Azure/kperf/contrib/internal/utils"
+	"github.com/Azure/kperf/contrib/log"
+	"github.com/Azure/kperf/contrib/utils"
 
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
@@ -19,7 +20,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog/v2"
 )
 
 // Command represents warmup subcommand.
@@ -80,7 +80,10 @@ var Command = cli.Command{
 	Action: func(cliCtx *cli.Context) (retErr error) {
 		ctx := context.Background()
 
-		rgCfgFile, rgCfgFileDone, err := utils.NewLoadProfileFromEmbed(
+		infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
+		warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
+
+		rgCfgFile, rgCfgFileDone, err := utils.NewRunnerGroupSpecFileFromEmbed(
 			"loadprofile/warmup.yaml",
 			func(spec *types.RunnerGroupSpec) error {
 				reqs := cliCtx.Int("total")
@@ -104,7 +107,8 @@ var Command = cli.Command{
 				spec.NodeAffinity = affinityLabels
 
 				data, _ := yaml.Marshal(spec)
-				klog.V(2).InfoS("Load Profile", "config", string(data))
+
+				infoLogger.LogKV("msg", "dump load profile", "config", string(data))
 				return nil
 			},
 		)
@@ -127,11 +131,11 @@ var Command = cli.Command{
 		cores, ferr := utils.FetchAPIServerCores(ctx, kubeCfgPath)
 		if ferr == nil {
 			if isReady(cliCtx, cores) {
-				klog.V(0).Infof("apiserver resource is ready: %v", cores)
+				infoLogger.LogKV("msg", fmt.Sprintf("apiserver resource is ready: %v", cores))
 				return nil
 			}
 		} else {
-			klog.V(0).ErrorS(ferr, "failed to fetch apiserver cores")
+			warnLogger.LogKV("msg", "failed to fetch apiserver cores", "error", ferr)
 		}
 
 		delNP, err := deployWarmupVirtualNodepool(ctx, kubeCfgPath, isEKS, virtualNodeAffinity)
@@ -168,7 +172,7 @@ var Command = cli.Command{
 		cores, ferr = utils.FetchAPIServerCores(ctx, kubeCfgPath)
 		if ferr == nil {
 			if isReady(cliCtx, cores) {
-				klog.V(0).Infof("apiserver resource is ready: %v", cores)
+				infoLogger.LogKV("msg", fmt.Sprintf("apiserver resource is ready: %v", cores))
 				return nil
 			}
 		}
@@ -194,7 +198,10 @@ func isReady(cliCtx *cli.Context, cores map[string]int) bool {
 func deployWarmupVirtualNodepool(ctx context.Context, kubeCfgPath string, isEKS bool, nodeAffinity string) (func() error, error) {
 	target := "warmup"
 
-	klog.V(0).InfoS("Deploying virtual nodepool", "name", target)
+	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
+	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
+
+	infoLogger.LogKV("msg", "deploying virtual nodepool", "name", target)
 
 	kr := utils.NewKperfRunner(kubeCfgPath, "")
 
@@ -208,9 +215,9 @@ func deployWarmupVirtualNodepool(ctx context.Context, kubeCfgPath string, isEKS 
 		}
 	}
 
-	klog.V(0).InfoS("Trying to delete", "nodepool", target)
+	infoLogger.LogKV("msg", "trying to delete", "nodepool", target)
 	if err = kr.DeleteNodepool(ctx, 0, target); err != nil {
-		klog.V(0).ErrorS(err, "failed to delete", "nodepool", target)
+		warnLogger.LogKV("msg", "failed to delete", "nodepool", target, "error", err)
 	}
 
 	err = kr.NewNodepool(ctx, 0, target, 100, 32, 96, 110, nodeAffinity, sharedProviderID)
@@ -226,7 +233,8 @@ func deployWarmupVirtualNodepool(ctx context.Context, kubeCfgPath string, isEKS 
 // patchEKSDaemonsetWithoutToleration removes tolerations to avoid pod scheduled
 // to virtual nodes.
 func patchEKSDaemonsetWithoutToleration(ctx context.Context, kubeCfgPath string) error {
-	klog.V(0).Info("Trying to removes EKS Daemonset's tolerations to avoid pod scheduled to virtual nodes")
+	log.GetLogger(ctx).WithKeyValues("level", "info").
+		LogKV("msg", "trying to removes EKS Daemonset's tolerations to avoid pod scheduled to virtual nodes")
 
 	clientset := mustClientset(kubeCfgPath)
 	ds := clientset.AppsV1().DaemonSets("kube-system")

@@ -10,10 +10,10 @@ import (
 	"time"
 
 	internaltypes "github.com/Azure/kperf/contrib/internal/types"
-	"github.com/Azure/kperf/contrib/internal/utils"
+	"github.com/Azure/kperf/contrib/log"
+	"github.com/Azure/kperf/contrib/utils"
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
-	"k8s.io/klog/v2"
 
 	"github.com/urfave/cli"
 )
@@ -118,7 +118,7 @@ var ciliumCRDs = []string{
 }
 
 func installCiliumCRDs(ctx context.Context, kr *utils.KubectlRunner) error {
-	klog.V(0).Info("Installing Cilium CRDs...")
+	log.GetLogger(ctx).WithKeyValues("level", "info").LogKV("msg", "Installing Cilium CRDs...")
 	for _, crdURL := range ciliumCRDs {
 		err := kr.Apply(ctx, kubectlApplyTimeout, crdURL)
 		if err != nil {
@@ -130,7 +130,8 @@ func installCiliumCRDs(ctx context.Context, kr *utils.KubectlRunner) error {
 
 func loadCiliumData(ctx context.Context, kr *utils.KubectlRunner, numCID int, numCEP int) error {
 	totalNumResources := numCID + numCEP
-	klog.V(0).Infof("Loading Cilium data (%d CiliumIdentities and %d CiliumEndpoints)...", numCID, numCEP)
+	log.GetLogger(ctx).WithKeyValues("level", "info").LogKV("msg", "Loading Cilium data",
+		"CiliumIdentities", numCID, "CiliumEndpoints", numCEP)
 
 	// Parallelize kubectl apply to speed it up. Achieves ~80 inserts/sec.
 	taskChan := make(chan string, numCRApplyWorkers*2)
@@ -153,7 +154,7 @@ func loadCiliumData(ctx context.Context, kr *utils.KubectlRunner, numCID int, nu
 							appliedCount.Add(1)
 							break
 						} else if i < maxNumCRApplyAttempts-1 {
-							klog.Warningf("Failed to apply cilium resource data, will retry: %s", err)
+							log.GetLogger(ctx).WithKeyValues("level", "warn").LogKV("msg", "failed to apply cilium resource data, will retry", "error", err)
 						}
 					}
 					if err != nil { // last retry failed, so give up.
@@ -178,7 +179,7 @@ func loadCiliumData(ctx context.Context, kr *utils.KubectlRunner, numCID int, nu
 			case <-timer.C:
 				c := appliedCount.Load()
 				percent := int(float64(c) / float64(totalNumResources) * 100)
-				klog.V(0).Infof("Applied %d/%d cilium resources (%d%%)", c, totalNumResources, percent)
+				log.GetLogger(ctx).WithKeyValues("level", "info").LogKV("msg", fmt.Sprintf("applied %d/%d cilium resources (%d%%)", c, totalNumResources, percent))
 			}
 		}
 	})
@@ -210,7 +211,7 @@ func loadCiliumData(ctx context.Context, kr *utils.KubectlRunner, numCID int, nu
 		return err
 	}
 
-	klog.V(0).Infof("Loaded %d CiliumIdentities and %d CiliumEndpoints\n", numCID, numCEP)
+	log.GetLogger(ctx).WithKeyValues("level", "info").LogKV("msg", fmt.Sprintf("loaded %d CiliumIdentities and %d CiliumEndpoints\n", numCID, numCEP))
 
 	return nil
 }
