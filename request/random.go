@@ -281,12 +281,13 @@ func (b *requestWatchListBuilder) Build(cli rest.Interface) Requester {
 			req: cli.Get().AbsPath(comps...).
 				SpecificallyVersionedParams(
 					&metav1.ListOptions{
-						LabelSelector:       b.labelSelector,
-						FieldSelector:       b.fieldSelector,
-						ResourceVersion:     "",
-						Watch:               true,
-						SendInitialEvents:   toPtr(true),
-						AllowWatchBookmarks: true,
+						LabelSelector:        b.labelSelector,
+						FieldSelector:        b.fieldSelector,
+						ResourceVersion:      "",
+						Watch:                true,
+						SendInitialEvents:    toPtr(true),
+						ResourceVersionMatch: metav1.ResourceVersionMatchNotOlderThan,
+						AllowWatchBookmarks:  true,
 					},
 					scheme.ParameterCodec,
 					schema.GroupVersion{Version: "v1"},
