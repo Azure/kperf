@@ -53,7 +53,7 @@ When that target cluster is ready, you can run
 ```bash
 $ sudo runkperf -v 3 bench \
   --kubeconfig $HOME/.kube/config \
-  --runner-image ghcr.io/azure/kperf:0.1.8 \
+  --runner-image ghcr.io/azure/kperf:latest \
   node10_job1_pod100 --total 1000
 ```
 

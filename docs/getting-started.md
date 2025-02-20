@@ -297,7 +297,7 @@ Let's say the local file `/tmp/example-runnergroup-spec.yaml`. You can run:
 
 ```bash
 $ kperf rg run \
-  --runner-image=ghcr.io/azure/kperf:0.1.8 \
+  --runner-image=ghcr.io/azure/kperf:latest \
   --runnergroup="file:///tmp/example-runnergroup-spec.yaml"
 ```
 
