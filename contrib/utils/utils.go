@@ -10,11 +10,9 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/Azure/kperf/api/types"
@@ -426,8 +424,7 @@ func runCommand(ctx context.Context, timeout time.Duration, cmd string, args []s
 		defer cancel()
 	}
 
-	c := exec.CommandContext(ctx, cmd, args...)
-	c.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
+	c := newExecCommand(ctx, cmd, args...)
 
 	logger.WithKeyValues("level", "info").LogKV("msg", "start command", "cmd", c.String())
 	output, err := c.CombinedOutput()
@@ -448,8 +445,7 @@ func runCommandWithInput(ctx context.Context, timeout time.Duration, cmd string,
 		defer cancel()
 	}
 
-	c := exec.CommandContext(ctx, cmd, args...)
-	c.SysProcAttr = &syscall.SysProcAttr{Pdeathsig: syscall.SIGKILL}
+	c := newExecCommand(ctx, cmd, args...)
 	c.Stdin = strings.NewReader(input)
 
 	logger.WithKeyValues("level", "info").LogKV("msg", "start command", "cmd", c.String())
