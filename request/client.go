@@ -9,10 +9,10 @@ import (
 	"net/http"
 
 	"github.com/Azure/kperf/api/types"
+	"github.com/Azure/kperf/request/unstructuredscheme"
 
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubectl/pkg/scheme"
 )
 
 // NewClients creates N rest.Interface.
@@ -31,7 +31,7 @@ func NewClients(kubeCfgPath string, connsNum int, opts ...ClientCfgOpt) ([]rest.
 	if err != nil {
 		return nil, err
 	}
-	restCfg.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	restCfg.NegotiatedSerializer = unstructuredscheme.NewNegotiatedSerializer()
 
 	// NOTE:
 	//
