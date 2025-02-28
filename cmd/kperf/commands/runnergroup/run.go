@@ -46,6 +46,11 @@ var runCommand = cli.Command{
 			Name:  "affinity",
 			Usage: "Deploy server to the node with a specific labels (FORMAT: KEY=VALUE[,VALUE])",
 		},
+		cli.IntFlag{
+			Name:  "runner-verbosity",
+			Usage: "The verbosity level of runners",
+			Value: 2,
+		},
 	},
 	Action: func(cliCtx *cli.Context) error {
 		imgRef := cliCtx.String("runner-image")
@@ -76,6 +81,7 @@ var runCommand = cli.Command{
 			kubeCfgPath,
 			imgRef,
 			specs[0],
+			cliCtx.Int("runner-verbosity"),
 			runner.WithRunCmdServerNodeSelectorsOpt(affinityLabels),
 			runner.WithRunCmdRunnerGroupFlowControl(priorityLevel, matchingPrecedence),
 		)

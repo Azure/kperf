@@ -52,6 +52,11 @@ var serverCommand = cli.Command{
 			Usage:    "The runner result should be stored in that path",
 			Required: true,
 		},
+		cli.IntFlag{
+			Name:  "runner-verbosity",
+			Usage: "The verbosity level of runners",
+			Value: 2,
+		},
 	},
 	Hidden: true,
 	Action: func(cliCtx *cli.Context) error {
@@ -90,6 +95,7 @@ func buildRunnerGroupHandlers(cliCtx *cli.Context, serverName string) ([]*runner
 	specURIs := cliCtx.StringSlice("runnergroup")
 	imgRef := cliCtx.String("runner-image")
 	namespace := cliCtx.String("namespace")
+	runnerVerbosity := cliCtx.Int("runner-verbosity")
 
 	ownerRef := ""
 	if cliCtx.IsSet("runner-owner") {
@@ -117,7 +123,7 @@ func buildRunnerGroupHandlers(cliCtx *cli.Context, serverName string) ([]*runner
 		}
 
 		groupName := fmt.Sprintf("%s-%d", serverName, idx)
-		g, err := runnergroup.NewHandler(clientset, namespace, groupName, spec, imgRef)
+		g, err := runnergroup.NewHandler(clientset, namespace, groupName, spec, imgRef, runnerVerbosity)
 		if err != nil {
 			return nil, err
 		}

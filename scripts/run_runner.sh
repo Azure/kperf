@@ -7,8 +7,8 @@ set -euo pipefail
 
 result_file=/data/${POD_NAMESPACE}-${POD_NAME}-${POD_UID}.json
 
-/kperf -v=2 runner run --config=/config/load_profile.yaml \
-		--user-agent=${POD_NAME} \
+/kperf -v=$1 runner run --config=/config/load_profile.yaml \
+    --user-agent=${POD_NAME} \
     --result=${result_file} \
     --raw-data
 

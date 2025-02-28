@@ -36,6 +36,7 @@ func CreateRunnerGroupServer(ctx context.Context,
 	kubeconfigPath string,
 	runnerImage string,
 	rgSpec *types.RunnerGroupSpec,
+	runnerVerbosity int,
 	opts ...RunCmdOpt,
 ) error {
 	specInStr, err := tweakAndMarshalSpec(rgSpec)
@@ -78,6 +79,8 @@ func CreateRunnerGroupServer(ctx context.Context,
 			"name="+runnerGroupServerReleaseName,
 			"image="+runnerImage,
 			"runnerGroupSpec="+specInStr,
+			// runnerVerbosity needs to be surrounded by quotes, so that YAML parse it as a string.
+			fmt.Sprintf("runnerVerbosity=\"%d\"", runnerVerbosity),
 		),
 		appiler,
 	)
