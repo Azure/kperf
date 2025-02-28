@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -45,6 +46,8 @@ type Handler struct {
 	imageRef string
 
 	clientset kubernetes.Interface
+
+	runnerVerbosity int
 }
 
 // NewHandler returns new instance of Handler.
@@ -53,6 +56,7 @@ func NewHandler(
 	namespace, name string,
 	spec *types.RunnerGroupSpec,
 	imageRef string,
+	runnerVerbosity int,
 ) (*Handler, error) {
 	ownRef, err := buildOwnerReference(spec.OwnerReference)
 	if err != nil {
@@ -66,6 +70,7 @@ func NewHandler(
 		ownerRef:  ownRef,
 		imageRef:  imageRef,
 		clientset: clientset,
+		runnerVerbosity: runnerVerbosity,
 	}, nil
 }
 
@@ -417,6 +422,7 @@ func (h *Handler) buildBatchJobObject(uploadURL string) *batchv1.Job {
 				},
 				Command: []string{
 					"/run_runner.sh",
+					strconv.Itoa(h.runnerVerbosity),
 				},
 			},
 		},
