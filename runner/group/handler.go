@@ -64,12 +64,12 @@ func NewHandler(
 	}
 
 	return &Handler{
-		name:      name,
-		namespace: namespace,
-		spec:      spec,
-		ownerRef:  ownRef,
-		imageRef:  imageRef,
-		clientset: clientset,
+		name:            name,
+		namespace:       namespace,
+		spec:            spec,
+		ownerRef:        ownRef,
+		imageRef:        imageRef,
+		clientset:       clientset,
 		runnerVerbosity: runnerVerbosity,
 	}, nil
 }
