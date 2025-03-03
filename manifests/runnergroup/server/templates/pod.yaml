@@ -35,6 +35,8 @@ spec:
     - v1:Pod:$(POD_NAME):$(POD_UID)
     - --runner-sa
     - {{ .Values.name }}
+    - --runner-verbosity
+    - {{ .Values.runnerVerbosity }}
     - --address
     - $(POD_IP):8080
     - --address
