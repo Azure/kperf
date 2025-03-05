@@ -409,6 +409,10 @@ func (h *Handler) buildBatchJobObject(uploadURL string) *batchv1.Job {
 						Name:  "TARGET_URL",
 						Value: uploadURL,
 					},
+					{
+						Name:  "RUNNER_VERBOSITY",
+						Value: strconv.Itoa(h.runnerVerbosity),
+					},
 				},
 				VolumeMounts: []corev1.VolumeMount{
 					{
@@ -422,7 +426,6 @@ func (h *Handler) buildBatchJobObject(uploadURL string) *batchv1.Job {
 				},
 				Command: []string{
 					"/run_runner.sh",
-					strconv.Itoa(h.runnerVerbosity),
 				},
 			},
 		},
