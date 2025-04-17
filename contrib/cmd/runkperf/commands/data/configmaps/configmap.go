@@ -42,8 +42,6 @@ var Command = cli.Command{
 	},
 }
 
-const maxTotalConfigmaps = 1000
-
 var configmapAddCommand = cli.Command{
 	Name:      "add",
 	Usage:     "Add configmap set",
@@ -62,7 +60,7 @@ var configmapAddCommand = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "total",
-			Usage: fmt.Sprintf("Total amount of configmaps, must be less than or equal to %d", maxTotalConfigmaps),
+			Usage: "Total amount of configmaps",
 			// 10 is the default size of a configmap
 			Value: 10,
 		},
@@ -185,9 +183,6 @@ var configmapListCommand = cli.Command{
 }
 
 func checkConfigmapParams(size int, groupSize int, total int) error {
-	if total > maxTotalConfigmaps {
-		return fmt.Errorf("total amount must be less than or equal to %d", maxTotalConfigmaps)
-	}
 	if size <= 0 {
 		return fmt.Errorf("size must be greater than 0")
 	}
