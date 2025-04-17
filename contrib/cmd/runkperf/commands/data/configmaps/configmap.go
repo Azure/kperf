@@ -12,8 +12,10 @@ import (
 	"strings"
 	"sync"
 	"text/tabwriter"
+	"time"
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
+	contributils "github.com/Azure/kperf/contrib/utils"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/flowcontrol"
 
@@ -33,6 +35,12 @@ var Command = cli.Command{
 			Name:  "kubeconfig",
 			Usage: "Path to the kubeconfig file",
 			Value: utils.DefaultKubeConfigPath,
+		},
+		cli.StringFlag{
+			Name:  "namespace",
+			Usage: "Namespace to create configmaps. Default value is `default`. If the namespace does not exist, it will be created.",
+			// default namespace is default
+			Value: "default",
 		},
 	},
 	Subcommands: []cli.Command{
@@ -85,12 +93,18 @@ var configmapAddCommand = cli.Command{
 			return err
 		}
 
+		namespace := cliCtx.GlobalString("namespace")
+		err = prepareNamespace(kubeCfgPath, namespace)
+		if err != nil {
+			return err
+		}
+
 		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
 		if err != nil {
 			return err
 		}
 
-		createConfigmaps(cmName, size, groupSize, total, clientset)
+		createConfigmaps(cmName, size, groupSize, total, clientset, namespace)
 		fmt.Printf("Created configmap %s with size %d KiB, group-size %d, total %d\n", cmName, size, groupSize, total)
 		return nil
 	},
@@ -110,6 +124,7 @@ var configmapDelCommand = cli.Command{
 			return fmt.Errorf("required non-empty configmaps set name")
 		}
 
+		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 		labelSelector := fmt.Sprintf("app=kperf,cmName=%s", cmName)
 
@@ -119,7 +134,7 @@ var configmapDelCommand = cli.Command{
 		}
 
 		// Delete each configmap
-		err = deleteConfigmaps(labelSelector, clientset)
+		err = deleteConfigmaps(labelSelector, clientset, namespace)
 		if err != nil {
 			return err
 		}
@@ -135,6 +150,7 @@ var configmapListCommand = cli.Command{
 	Usage:     "List generated configmaps",
 	ArgsUsage: "NAME",
 	Action: func(cliCtx *cli.Context) error {
+		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
 		if err != nil {
@@ -164,7 +180,7 @@ var configmapListCommand = cli.Command{
 			labelSelector = fmt.Sprintf("app=kperf, cmName in (%s)", namesStr)
 		}
 		cmMap := make(map[string][]int)
-		err = listConfigmapsByName(cmMap, labelSelector, clientset)
+		err = listConfigmapsByName(cmMap, labelSelector, clientset, namespace)
 
 		if err != nil {
 			return err
@@ -180,6 +196,24 @@ var configmapListCommand = cli.Command{
 		}
 		return tw.Flush()
 	},
+}
+
+func prepareNamespace(kubeCfgPath string, namespace string) error {
+	if namespace == "" {
+		return fmt.Errorf("namespace cannot be empty")
+	}
+
+	if namespace == "default" {
+		return nil
+	}
+
+	ctx := context.Background()
+	kr := contributils.NewKubectlRunner(kubeCfgPath, namespace)
+	err := kr.CreateNamespace(ctx, 5*time.Minute, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to create namespace %s: %v", namespace, err)
+	}
+	return nil
 }
 
 func checkConfigmapParams(size int, groupSize int, total int) error {
@@ -226,7 +260,7 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func createConfigmaps(cmName string, size int, groupSize int, total int, clientset *kubernetes.Clientset) {
+func createConfigmaps(cmName string, size int, groupSize int, total int, clientset *kubernetes.Clientset, namespace string) {
 	// Generate configmaps in parallel with fixed group size
 	// and random data
 	for i := 0; i < total; i = i + groupSize {
@@ -236,7 +270,7 @@ func createConfigmaps(cmName string, size int, groupSize int, total int, clients
 			wg.Add(1)
 			go func(jj int) {
 				defer wg.Done()
-				cli := clientset.CoreV1().ConfigMaps("default")
+				cli := clientset.CoreV1().ConfigMaps(namespace)
 
 				name := fmt.Sprintf("kperf-cm-%s-%d", cmName, jj)
 
@@ -264,9 +298,9 @@ func createConfigmaps(cmName string, size int, groupSize int, total int, clients
 	}
 }
 
-func deleteConfigmaps(labelSelector string, clientset *kubernetes.Clientset) error {
+func deleteConfigmaps(labelSelector string, clientset *kubernetes.Clientset, namespace string) error {
 	// List all configmaps with the label selector
-	configMaps, err := listConfigmaps(clientset, labelSelector)
+	configMaps, err := listConfigmaps(clientset, labelSelector, namespace)
 	if err != nil {
 		return err
 	}
@@ -283,7 +317,7 @@ func deleteConfigmaps(labelSelector string, clientset *kubernetes.Clientset) err
 			wg.Add(1)
 			go func(jj int) {
 				defer wg.Done()
-				err := clientset.CoreV1().ConfigMaps("default").Delete(context.TODO(), configMaps.Items[jj].Name, metav1.DeleteOptions{})
+				err := clientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMaps.Items[jj].Name, metav1.DeleteOptions{})
 				if err != nil {
 					fmt.Printf("Failed to delete configmap %s: %v\n", configMaps.Items[jj].Name, err)
 					return
@@ -296,8 +330,8 @@ func deleteConfigmaps(labelSelector string, clientset *kubernetes.Clientset) err
 	return nil
 }
 
-func listConfigmaps(clientset *kubernetes.Clientset, labelSelector string) (*corev1.ConfigMapList, error) {
-	configMaps, err := clientset.CoreV1().ConfigMaps("default").List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+func listConfigmaps(clientset *kubernetes.Clientset, labelSelector string, namespace string) (*corev1.ConfigMapList, error) {
+	configMaps, err := clientset.CoreV1().ConfigMaps(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list configmaps: %v", err)
 	}
@@ -306,8 +340,8 @@ func listConfigmaps(clientset *kubernetes.Clientset, labelSelector string) (*cor
 }
 
 // Get info of configmaps by name
-func listConfigmapsByName(cmMap map[string][]int, labelSelector string, clientset *kubernetes.Clientset) error {
-	configMaps, err := listConfigmaps(clientset, labelSelector)
+func listConfigmapsByName(cmMap map[string][]int, labelSelector string, clientset *kubernetes.Clientset, namespace string) error {
+	configMaps, err := listConfigmaps(clientset, labelSelector, namespace)
 
 	if err != nil {
 		return err
