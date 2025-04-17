@@ -71,35 +71,20 @@ var configmapAddCommand = cli.Command{
 		if cliCtx.NArg() != 1 {
 			return fmt.Errorf("required only one argument as configmaps set name: %v", cliCtx.Args())
 		}
-		total := cliCtx.Int("total")
-		if total > maxTotalConfigmaps {
-			return fmt.Errorf("total amount must be less than or equal to %d", maxTotalConfigmaps)
-		}
-
 		cmName := strings.TrimSpace(cliCtx.Args().Get(0))
 		if len(cmName) == 0 {
 			return fmt.Errorf("required non-empty configmap set name")
 		}
 
-		// Check if the flags are set correctly
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 		size := cliCtx.Int("size")
 		groupSize := cliCtx.Int("group-size")
+		total := cliCtx.Int("total")
 
-		if size <= 0 {
-			return fmt.Errorf("size must be greater than 0")
-		}
-		if groupSize <= 0 {
-			return fmt.Errorf("group-size must be greater than 0")
-		}
-		if total <= 0 {
-			return fmt.Errorf("total amount must be greater than 0")
-		}
-		if groupSize > total {
-			return fmt.Errorf("group-size must be less than or equal to total")
-		}
-		if total%groupSize != 0 {
-			return fmt.Errorf("total must be divisible by group-size")
+		// Check if the flags are set correctly
+		err := checkConfigmapParams(size, groupSize, total)
+		if err != nil {
+			return err
 		}
 
 		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
@@ -181,7 +166,7 @@ var configmapListCommand = cli.Command{
 			labelSelector = fmt.Sprintf("app=kperf, cmName in (%s)", namesStr)
 		}
 		cmMap := make(map[string][]int)
-		err = listConfigmapsByName(&cmMap, labelSelector, clientset)
+		err = listConfigmapsByName(cmMap, labelSelector, clientset)
 
 		if err != nil {
 			return err
@@ -197,6 +182,28 @@ var configmapListCommand = cli.Command{
 		}
 		return tw.Flush()
 	},
+}
+
+func checkConfigmapParams(size int, groupSize int, total int) error {
+	if total > maxTotalConfigmaps {
+		return fmt.Errorf("total amount must be less than or equal to %d", maxTotalConfigmaps)
+	}
+	if size <= 0 {
+		return fmt.Errorf("size must be greater than 0")
+	}
+	if groupSize <= 0 {
+		return fmt.Errorf("group-size must be greater than 0")
+	}
+	if total <= 0 {
+		return fmt.Errorf("total amount must be greater than 0")
+	}
+	if groupSize > total {
+		return fmt.Errorf("group-size must be less than or equal to total")
+	}
+	if total%groupSize != 0 {
+		return fmt.Errorf("total must be divisible by group-size")
+	}
+	return nil
 }
 
 func newClientsetWithRateLimiter(kubeCfgPath string, qps float32, burst int) (*kubernetes.Clientset, error) {
@@ -304,7 +311,7 @@ func listConfigmaps(clientset *kubernetes.Clientset, labelSelector string) (*cor
 }
 
 // Get info of configmaps by name
-func listConfigmapsByName(cmMap *map[string][]int, labelSelector string, clientset *kubernetes.Clientset) error {
+func listConfigmapsByName(cmMap map[string][]int, labelSelector string, clientset *kubernetes.Clientset) error {
 	configMaps, err := listConfigmaps(clientset, labelSelector)
 
 	if err != nil {
@@ -317,16 +324,16 @@ func listConfigmapsByName(cmMap *map[string][]int, labelSelector string, clients
 			return fmt.Errorf("failed to find the cmName of configmap %s", cm.Name)
 		}
 
-		_, ok = (*cmMap)[name]
+		_, ok = cmMap[name]
 		if !ok {
 			// Initialize the map with default values
 			// size, group-size, total in int list
-			(*cmMap)[name] = []int{0, 0, 0}
+			cmMap[name] = []int{0, 0, 0}
 
 			// Get the size of the configmap
 			_, ok = cm.Data["data"]
 			if ok {
-				(*cmMap)[name][0] = len(cm.Data["data"])
+				cmMap[name][0] = len(cm.Data["data"])
 			}
 		}
 
@@ -337,15 +344,15 @@ func listConfigmapsByName(cmMap *map[string][]int, labelSelector string, clients
 
 		if ownerIdInt, err := strconv.Atoi(ownerId); err == nil {
 			// Update the max ownerId in the map to calculate the group size
-			if ownerIdInt > (*cmMap)[name][1] {
-				(*cmMap)[name][1] = ownerIdInt
+			if ownerIdInt > cmMap[name][1] {
+				cmMap[name][1] = ownerIdInt
 			}
 		} else {
 			return fmt.Errorf("failed to convert ownerId %s to int: %v", ownerId, err)
 		}
 
 		// Increment the total count of configmaps
-		(*cmMap)[name][2] += 1
+		cmMap[name][2] += 1
 
 	}
 
