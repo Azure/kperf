@@ -235,7 +235,7 @@ func createConfigmaps(cmName string, size int, groupSize int, total int, clients
 	// Generate configmaps in parallel with fixed group size
 	// and random data
 	for i := 0; i < total; i = i + groupSize {
-		ownerId := i
+		ownerID := i
 		var wg sync.WaitGroup
 		for j := i; j < i+groupSize && j < total; j++ {
 			wg.Add(1)
@@ -249,7 +249,7 @@ func createConfigmaps(cmName string, size int, groupSize int, total int, clients
 				cm.Name = name
 				// Set the labels for the configmap to easily identify in delete or list commands
 				cm.Labels = map[string]string{
-					"ownerId": strconv.Itoa(ownerId),
+					"ownerID": strconv.Itoa(ownerID),
 					"app":     "kperf",
 					"cmName":  cmName,
 				}
@@ -337,22 +337,22 @@ func listConfigmapsByName(cmMap map[string][]int, labelSelector string, clientse
 			}
 		}
 
-		ownerId, ok := cm.Labels["ownerId"]
+		ownerID, ok := cm.Labels["ownerID"]
 		if !ok {
-			return fmt.Errorf("failed to find the ownerId of configmap %s", name)
+			return fmt.Errorf("failed to find the ownerID of configmap %s", name)
 		}
 
-		if ownerIdInt, err := strconv.Atoi(ownerId); err == nil {
-			// Update the max ownerId in the map to calculate the group size
-			if ownerIdInt > cmMap[name][1] {
-				cmMap[name][1] = ownerIdInt
+		if ownerIDInt, err := strconv.Atoi(ownerID); err == nil {
+			// Update the max ownerID in the map to calculate the group size
+			if ownerIDInt > cmMap[name][1] {
+				cmMap[name][1] = ownerIDInt
 			}
 		} else {
-			return fmt.Errorf("failed to convert ownerId %s to int: %v", ownerId, err)
+			return fmt.Errorf("failed to convert ownerID %s to int: %v", ownerID, err)
 		}
 
 		// Increment the total count of configmaps
-		cmMap[name][2] += 1
+		cmMap[name][2]++
 
 	}
 
