@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/Azure/kperf/cmd/kperf/commands/configmaps"
 	"github.com/Azure/kperf/cmd/kperf/commands/runner"
 	"github.com/Azure/kperf/cmd/kperf/commands/runnergroup"
 	"github.com/Azure/kperf/cmd/kperf/commands/virtualcluster"
@@ -27,7 +26,6 @@ func App() *cli.App {
 			runner.Command,
 			runnergroup.Command,
 			virtualcluster.Command,
-			configmaps.Command,
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{

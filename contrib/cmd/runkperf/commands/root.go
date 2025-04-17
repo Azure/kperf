@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/bench"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/warmup"
 
 	"github.com/urfave/cli"
@@ -24,6 +25,7 @@ func App() *cli.App {
 		Commands: []cli.Command{
 			warmup.Command,
 			bench.Command,
+			data.Command,
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{
