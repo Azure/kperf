@@ -10,8 +10,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"text/tabwriter"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"k8s.io/client-go/tools/clientcmd"
@@ -102,7 +103,10 @@ var configmapAddCommand = cli.Command{
 			return err
 		}
 
-		createConfigmaps(clientset, namespace, cmName, size, groupSize, total)
+		err = createConfigmaps(clientset, namespace, cmName, size, groupSize, total)
+		if err != nil {
+			return err
+		}
 		fmt.Printf("Created configmap %s with size %d KiB, group-size %d, total %d\n", cmName, size, groupSize, total)
 		return nil
 	},
@@ -137,7 +141,7 @@ var configmapDelCommand = cli.Command{
 			return err
 		}
 
-		fmt.Printf("Deleted configmap %s\n", cmName)
+		fmt.Printf("Deleted configmap %s in %s namespace\n", cmName, namespace)
 		return nil
 
 	},
@@ -266,19 +270,17 @@ func randString(n int) string {
 	return string(b)
 }
 
-func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName string, size int, groupSize int, total int) {
+func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName string, size int, groupSize int, total int) error {
 	// Generate configmaps in parallel with fixed group size
 	// and random data
 	for i := 0; i < total; i = i + groupSize {
 		ownerID := i
-		var wg sync.WaitGroup
+		g := new(errgroup.Group)
 		for j := i; j < i+groupSize && j < total; j++ {
-			wg.Add(1)
-			go func(jj int) {
-				defer wg.Done()
+			g.Go(func() error {
 				cli := clientset.CoreV1().ConfigMaps(namespace)
 
-				name := fmt.Sprintf("%s-cm-%s-%d", appLebel, cmName, jj)
+				name := fmt.Sprintf("%s-cm-%s-%d", appLebel, cmName, j)
 
 				cm := &corev1.ConfigMap{}
 				cm.Name = name
@@ -294,14 +296,16 @@ func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName 
 
 				_, err := cli.Create(context.TODO(), cm, metav1.CreateOptions{})
 				if err != nil {
-					fmt.Printf("Failed to create configmap %s: %v\n", name, err)
-					return
+					return fmt.Errorf("failed to create configmap %s: %v", name, err)
 				}
-
-			}(j)
+				return nil
+			})
 		}
-		wg.Wait()
+		if err := g.Wait(); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 func deleteConfigmaps(clientset *kubernetes.Clientset, labelSelector string, namespace string) error {
@@ -312,27 +316,26 @@ func deleteConfigmaps(clientset *kubernetes.Clientset, labelSelector string, nam
 	}
 
 	if len(configMaps.Items) == 0 {
-		fmt.Printf("No configmaps set found. Label for this set: %s\n", labelSelector)
-		return nil
+		return fmt.Errorf("no configmaps set found in namespace: %s", namespace)
 	}
 	// Delete each configmap in parallel with fixed group size
 	n, batch := len(configMaps.Items), 10
 	for i := 0; i < n; i = i + batch {
-		var wg sync.WaitGroup
+		g := new(errgroup.Group)
 		for j := i; j < i+batch && j < n; j++ {
-			wg.Add(1)
-			go func(jj int) {
-				defer wg.Done()
-				err := clientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMaps.Items[jj].Name, metav1.DeleteOptions{})
+			g.Go(func() error {
+				err := clientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMaps.Items[j].Name, metav1.DeleteOptions{})
 				if err != nil && !errors.IsNotFound(err) {
 					// Ignore not found errors
-					fmt.Printf("Failed to delete configmap %s: %v\n", configMaps.Items[jj].Name, err)
-					return
+					return fmt.Errorf("failed to delete configmap %s: %v", configMaps.Items[j].Name, err)
 				}
-			}(j)
+				return nil
+			})
 		}
 
-		wg.Wait()
+		if err := g.Wait(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
