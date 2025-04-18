@@ -38,8 +38,7 @@ var Command = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "namespace",
-			Usage: "Namespace to create configmaps. Default value is `default`. If the namespace does not exist, it will be created.",
-			// default namespace is default
+			Usage: "Namespace to use with commands. If the namespace does not exist, it will be created.",
 			Value: "default",
 		},
 	},
@@ -57,8 +56,7 @@ var configmapAddCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "size",
-			Usage: "The size of each configmap, unit is KiB",
-			// 100 KiB is the default size of a configmap
+			Usage: "The size of each configmap (Unit: KiB)",
 			Value: 100,
 		},
 		cli.IntFlag{
@@ -69,7 +67,6 @@ var configmapAddCommand = cli.Command{
 		cli.IntFlag{
 			Name:  "total",
 			Usage: "Total amount of configmaps",
-			// 10 is the default size of a configmap
 			Value: 10,
 		},
 	},
