@@ -102,7 +102,7 @@ var configmapAddCommand = cli.Command{
 			return err
 		}
 
-		createConfigmaps(cmName, size, groupSize, total, clientset, namespace)
+		createConfigmaps(clientset, namespace, cmName, size, groupSize, total)
 		fmt.Printf("Created configmap %s with size %d KiB, group-size %d, total %d\n", cmName, size, groupSize, total)
 		return nil
 	},
@@ -132,7 +132,7 @@ var configmapDelCommand = cli.Command{
 		}
 
 		// Delete each configmap
-		err = deleteConfigmaps(labelSelector, clientset, namespace)
+		err = deleteConfigmaps(clientset, labelSelector, namespace)
 		if err != nil {
 			return err
 		}
@@ -178,7 +178,7 @@ var configmapListCommand = cli.Command{
 			labelSelector = fmt.Sprintf("app=%s, cmName in (%s)", appLebel, namesStr)
 		}
 		cmMap := make(map[string][]int)
-		err = listConfigmapsByName(cmMap, labelSelector, clientset, namespace)
+		err = listConfigmapsByName(clientset, labelSelector, namespace, cmMap)
 
 		if err != nil {
 			return err
@@ -266,7 +266,7 @@ func randString(n int) string {
 	return string(b)
 }
 
-func createConfigmaps(cmName string, size int, groupSize int, total int, clientset *kubernetes.Clientset, namespace string) {
+func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName string, size int, groupSize int, total int) {
 	// Generate configmaps in parallel with fixed group size
 	// and random data
 	for i := 0; i < total; i = i + groupSize {
@@ -304,7 +304,7 @@ func createConfigmaps(cmName string, size int, groupSize int, total int, clients
 	}
 }
 
-func deleteConfigmaps(labelSelector string, clientset *kubernetes.Clientset, namespace string) error {
+func deleteConfigmaps(clientset *kubernetes.Clientset, labelSelector string, namespace string) error {
 	// List all configmaps with the label selector
 	configMaps, err := listConfigmaps(clientset, labelSelector, namespace)
 	if err != nil {
@@ -347,7 +347,7 @@ func listConfigmaps(clientset *kubernetes.Clientset, labelSelector string, names
 }
 
 // Get info of configmaps by name
-func listConfigmapsByName(cmMap map[string][]int, labelSelector string, clientset *kubernetes.Clientset, namespace string) error {
+func listConfigmapsByName(clientset *kubernetes.Clientset, labelSelector string, namespace string, cmMap map[string][]int) error {
 	configMaps, err := listConfigmaps(clientset, labelSelector, namespace)
 
 	if err != nil {
