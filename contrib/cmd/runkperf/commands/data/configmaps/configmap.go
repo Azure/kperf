@@ -324,7 +324,8 @@ func deleteConfigmaps(labelSelector string, clientset *kubernetes.Clientset, nam
 			go func(jj int) {
 				defer wg.Done()
 				err := clientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMaps.Items[jj].Name, metav1.DeleteOptions{})
-				if err != nil {
+				if err != nil && !errors.IsNotFound(err) {
+					// Ignore not found errors
 					fmt.Printf("Failed to delete configmap %s: %v\n", configMaps.Items[jj].Name, err)
 					return
 				}
