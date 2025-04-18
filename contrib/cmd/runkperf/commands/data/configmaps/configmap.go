@@ -261,7 +261,7 @@ func newClientsetWithRateLimiter(kubeCfgPath string, qps float32, burst int) (*k
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func RandStringRunes(n int) string {
+func randString(n int) string {
 	b := make([]rune, n)
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
@@ -292,7 +292,7 @@ func createConfigmaps(cmName string, size int, groupSize int, total int, clients
 					"cmName":  cmName,
 				}
 				cm.Data = map[string]string{
-					"data": RandStringRunes(size),
+					"data": randString(size),
 				}
 
 				_, err := cli.Create(context.TODO(), cm, metav1.CreateOptions{})
