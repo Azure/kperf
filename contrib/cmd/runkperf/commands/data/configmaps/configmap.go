@@ -26,6 +26,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+var appLebel string = "runkperf"
+
 var Command = cli.Command{
 	Name:      "configmap",
 	ShortName: "cm",
@@ -123,7 +125,7 @@ var configmapDelCommand = cli.Command{
 
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		labelSelector := fmt.Sprintf("app=kperf,cmName=%s", cmName)
+		labelSelector := fmt.Sprintf("app=%s,cmName=%s", appLebel, cmName)
 
 		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
 		if err != nil {
@@ -165,16 +167,16 @@ var configmapListCommand = cli.Command{
 		fmt.Fprintln(tw, "NAME\tSIZE\tGROUP_SIZE\tTOTAL\t")
 
 		// Build the label selector
-		// If no args are provided, list all configmaps with the label app=kperf
-		// If args are provided, list all configmaps with the label app=kperf and cmName in (args)
+		// If no args are provided, list all configmaps with the label app=runkperf
+		// If args are provided, list all configmaps with the label app=runkperf and cmName in (args)
 		var labelSelector string
 		if cliCtx.NArg() == 0 {
-			labelSelector = "app=kperf"
+			labelSelector = fmt.Sprintf("app=%s", appLebel)
 
 		} else {
 			args := cliCtx.Args()
 			namesStr := strings.Join(args, ",")
-			labelSelector = fmt.Sprintf("app=kperf, cmName in (%s)", namesStr)
+			labelSelector = fmt.Sprintf("app=%s, cmName in (%s)", appLebel, namesStr)
 		}
 		cmMap := make(map[string][]int)
 		err = listConfigmapsByName(cmMap, labelSelector, clientset, namespace)
@@ -269,14 +271,14 @@ func createConfigmaps(cmName string, size int, groupSize int, total int, clients
 				defer wg.Done()
 				cli := clientset.CoreV1().ConfigMaps(namespace)
 
-				name := fmt.Sprintf("kperf-cm-%s-%d", cmName, jj)
+				name := fmt.Sprintf("%s-cm-%s-%d", appLebel, cmName, jj)
 
 				cm := &corev1.ConfigMap{}
 				cm.Name = name
 				// Set the labels for the configmap to easily identify in delete or list commands
 				cm.Labels = map[string]string{
 					"ownerID": strconv.Itoa(ownerID),
-					"app":     "kperf",
+					"app":     appLebel,
 					"cmName":  cmName,
 				}
 				cm.Data = map[string]string{
