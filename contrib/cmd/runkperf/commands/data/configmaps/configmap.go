@@ -12,16 +12,15 @@ import (
 	"strings"
 	"sync"
 	"text/tabwriter"
-	"time"
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
-	contributils "github.com/Azure/kperf/contrib/utils"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/flowcontrol"
 
 	"github.com/urfave/cli"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -206,10 +205,21 @@ func prepareNamespace(kubeCfgPath string, namespace string) error {
 		return nil
 	}
 
-	ctx := context.Background()
-	kr := contributils.NewKubectlRunner(kubeCfgPath, namespace)
-	err := kr.CreateNamespace(ctx, 5*time.Minute, namespace)
+	clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
 	if err != nil {
+		return err
+	}
+
+	_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		// If the namespace already exists, ignore the error
+		if errors.IsAlreadyExists(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to create namespace %s: %v", namespace, err)
 	}
 	return nil
