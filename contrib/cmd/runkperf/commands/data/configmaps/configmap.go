@@ -188,7 +188,7 @@ var configmapListCommand = cli.Command{
 			fmt.Fprintf(tw, "%s\t%d\t%d\t%d\n",
 				key,
 				value[0],
-				value[2]-value[1],
+				value[1],
 				value[2],
 			)
 		}
@@ -237,9 +237,6 @@ func checkConfigmapParams(size int, groupSize int, total int) error {
 	}
 	if groupSize > total {
 		return fmt.Errorf("group-size must be less than or equal to total")
-	}
-	if total%groupSize != 0 {
-		return fmt.Errorf("total must be divisible by group-size")
 	}
 	return nil
 }
@@ -375,13 +372,20 @@ func listConfigmapsByName(cmMap map[string][]int, labelSelector string, clientse
 			}
 		}
 
+		// Increment the total count of configmaps
+		cmMap[name][2]++
+
+		if cmMap[name][1] != 0 {
+			continue
+		}
+
 		ownerID, ok := cm.Labels["ownerID"]
 		if !ok {
 			return fmt.Errorf("failed to find the ownerID of configmap %s", name)
 		}
 
 		if ownerIDInt, err := strconv.Atoi(ownerID); err == nil {
-			// Update the max ownerID in the map to calculate the group size
+			// Use the ownerID to get the group size
 			if ownerIDInt > cmMap[name][1] {
 				cmMap[name][1] = ownerIDInt
 			}
@@ -389,10 +393,6 @@ func listConfigmapsByName(cmMap map[string][]int, labelSelector string, clientse
 			return fmt.Errorf("failed to convert ownerID %s to int: %v", ownerID, err)
 		}
 
-		// Increment the total count of configmaps
-		cmMap[name][2]++
-
 	}
-
 	return nil
 }
