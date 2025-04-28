@@ -5,8 +5,9 @@ package configmaps
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -262,12 +263,20 @@ func newClientsetWithRateLimiter(kubeCfgPath string, qps float32, burst int) (*k
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-func randString(n int) string {
+func randString(n int) (string, error) {
+	if n <= 0 {
+		return "", fmt.Errorf("length must be positive")
+	}
+
 	b := make([]rune, n)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		random, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
+		if err != nil {
+			return "", fmt.Errorf("error generating random number: %w", err)
+		}
+		b[i] = rune(letterRunes[int(random.Int64())])
 	}
-	return string(b)
+	return string(b), nil
 }
 
 func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName string, size int, groupSize int, total int) error {
@@ -290,11 +299,15 @@ func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName 
 					"app":     appLebel,
 					"cmName":  cmName,
 				}
+				data, err := randString(size)
+				if err != nil {
+					return fmt.Errorf("failed to generate random string for configmap %s: %v", name, err)
+				}
 				cm.Data = map[string]string{
-					"data": randString(size),
+					"data": data,
 				}
 
-				_, err := cli.Create(context.TODO(), cm, metav1.CreateOptions{})
+				_, err = cli.Create(context.TODO(), cm, metav1.CreateOptions{})
 				if err != nil {
 					return fmt.Errorf("failed to create configmap %s: %v", name, err)
 				}
