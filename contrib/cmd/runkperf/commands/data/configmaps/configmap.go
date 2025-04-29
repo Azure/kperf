@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var appLebel string = "runkperf"
+var appLebel = "runkperf"
 
 var Command = cli.Command{
 	Name:      "configmap",
@@ -274,7 +274,7 @@ func randString(n int) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("error generating random number: %w", err)
 		}
-		b[i] = rune(letterRunes[int(random.Int64())])
+		b[i] = letterRunes[int(random.Int64())]
 	}
 	return string(b), nil
 }
