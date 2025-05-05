@@ -82,7 +82,13 @@ func benchConfigmapsRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 
 	defer func() {
 		// Delete the configmaps after the benchmark
-		utils.DeleteConfigmaps(ctx, kubeCfgPath, benchConfigmapNamespace, 0)
+		err = utils.DeleteConfigmaps(ctx, kubeCfgPath, benchConfigmapNamespace, 0)
+		if err != nil {
+			log.GetLogger(ctx).WithKeyValues("level", "error").
+				LogKV("msg", fmt.Sprintf("Failed to delete configmaps: %v", err))
+		}
+
+		// Delete the namespace after the benchmark
 		kr := utils.NewKubectlRunner(kubeCfgPath, benchConfigmapNamespace)
 		err := kr.DeleteNamespace(ctx, 0, benchConfigmapNamespace)
 		if err != nil {
