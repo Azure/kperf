@@ -93,7 +93,7 @@ func (r *WeightedRandomRequests) Run(ctx context.Context, total int) {
 }
 
 // Run starts to random pick request in specific time duration.
-func (r *WeightedRandomRequests) RunWithDuration(ctx context.Context, timeDuration time.Duration) {
+func (r *WeightedRandomRequests) RunForDuration(ctx context.Context, timeDuration time.Duration) {
 	end := time.Now().Add(timeDuration)
 
 	defer r.wg.Done()

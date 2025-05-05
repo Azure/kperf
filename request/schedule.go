@@ -131,7 +131,7 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 		// Otherwise, we will run for total time.
 		rndReqs.Run(ctx, spec.Total)
 	} else if spec.TotalTime > 0 {
-		rndReqs.RunWithDuration(ctx, time.Duration(spec.TotalTime)*time.Second)
+		rndReqs.RunForDuration(ctx, time.Duration(spec.TotalTime)*time.Second)
 	}
 	rndReqs.Stop()
 	wg.Wait()
