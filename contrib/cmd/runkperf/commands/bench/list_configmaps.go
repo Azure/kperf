@@ -18,8 +18,7 @@ var benchListConfigmapsCase = cli.Command{
 	Name: "list_configmaps",
 	Usage: `
 
-The test suite is to generate configmaps and list them. It will create configmaps 
-in a namespace and list them. The load profile is fixed.
+The test suite is to generate configmaps in a namespace and list them. The load profile is fixed.
 	`,
 	Flags: []cli.Flag{
 		cli.IntFlag{
