@@ -24,8 +24,8 @@ in a namespace and list them. The load profile is fixed.
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "size",
-			Usage: "The size of each configmap",
-			Value: 20,
+			Usage: "The size of each configmap (Unit: KiB)",
+			Value: 100,
 		},
 		cli.IntFlag{
 			Name:  "group-size",
