@@ -88,6 +88,11 @@ var runCommand = cli.Command{
 			Name:  "raw-data",
 			Usage: "show raw letencies data in result",
 		},
+		cli.IntFlag{
+			Name:  "total-time",
+			Usage: "Total time for runner to run. Unit is Sec. It will be ignored if --total is set.",
+			Value: 0,
+		},
 	},
 	Action: func(cliCtx *cli.Context) error {
 		kubeCfgPath := cliCtx.String("kubeconfig")
@@ -168,6 +173,15 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 	}
 	if v := "client"; cliCtx.IsSet(v) || profileCfg.Spec.Client == 0 {
 		profileCfg.Spec.Client = cliCtx.Int(v)
+	}
+	if v := "total"; !cliCtx.IsSet(v) && profileCfg.Spec.Total == 0 {
+		if v := "total-time"; cliCtx.IsSet(v) {
+			profileCfg.Spec.TotalTime = cliCtx.Int(v)
+		}
+		if profileCfg.Spec.TotalTime > 0 {
+			// Setting Total to -1 to indicate that TotalTime is being used
+			profileCfg.Spec.Total = -1
+		}
 	}
 	if v := "total"; cliCtx.IsSet(v) || profileCfg.Spec.Total == 0 {
 		profileCfg.Spec.Total = cliCtx.Int(v)

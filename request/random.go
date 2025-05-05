@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/Azure/kperf/api/types"
 
@@ -83,6 +84,25 @@ func (r *WeightedRandomRequests) Run(ctx context.Context, total int) {
 		select {
 		case r.reqBuilderCh <- builder:
 			sum++
+		case <-r.ctx.Done():
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// Run starts to random pick request in specific time duration.
+func (r *WeightedRandomRequests) RunWithDuration(ctx context.Context, timeDuration time.Duration) {
+	end := time.Now().Add(timeDuration)
+
+	defer r.wg.Done()
+	r.wg.Add(1)
+
+	for time.Now().Before(end) {
+		builder := r.randomPick()
+		select {
+		case r.reqBuilderCh <- builder:
 		case <-r.ctx.Done():
 			return
 		case <-ctx.Done():

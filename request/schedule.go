@@ -119,13 +119,20 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 		"connections", len(restCli),
 		"rate", qps,
 		"total", spec.Total,
+		"total-time", spec.TotalTime,
 		"http2", !spec.DisableHTTP2,
 		"content-type", spec.ContentType,
 	)
 
 	start := time.Now()
 
-	rndReqs.Run(ctx, spec.Total)
+	if spec.Total > 0 {
+		// If total is set, we will run for total requests.
+		// Otherwise, we will run for total time.
+		rndReqs.Run(ctx, spec.Total)
+	} else if spec.TotalTime > 0 {
+		rndReqs.RunWithDuration(ctx, time.Duration(spec.TotalTime)*time.Second)
+	}
 	rndReqs.Stop()
 	wg.Wait()
 
