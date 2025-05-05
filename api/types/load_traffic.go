@@ -41,7 +41,7 @@ type LoadProfileSpec struct {
 	Rate float64 `json:"rate" yaml:"rate"`
 	// Total defines the total number of requests.
 	Total int `json:"total" yaml:"total"`
-	// Conns defines total number of long connections used for traffic.
+	// TotalTime defines the total running time in seconds (zero is no limit).
 	TotalTime int `json:"total_time" yaml:"total_time"`
 	// Conns defines total number of long connections used for traffic.
 	Conns int `json:"conns" yaml:"conns"`
