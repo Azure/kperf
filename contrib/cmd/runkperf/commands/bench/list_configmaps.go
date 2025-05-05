@@ -14,7 +14,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-var benchConfigmapsCase = cli.Command{
+var benchListConfigmapsCase = cli.Command{
 	Name: "list_configmaps",
 	Usage: `
 
@@ -50,7 +50,7 @@ in a namespace and list them. The load profile is fixed.
 	},
 	Action: func(cliCtx *cli.Context) error {
 		_, err := renderBenchmarkReportInterceptor(
-			addAPIServerCoresInfoInterceptor(benchConfigmapsRun),
+			addAPIServerCoresInfoInterceptor(benchListConfigmapsRun),
 		)(cliCtx)
 		return err
 	},
@@ -59,7 +59,7 @@ in a namespace and list them. The load profile is fixed.
 var benchConfigmapNamespace = "kperf-configmaps-bench"
 
 // benchfigmapsCase is for subcommand benchConfigmapsCase.
-func benchConfigmapsRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, error) {
+func benchListConfigmapsRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, error) {
 	ctx := context.Background()
 	kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 
