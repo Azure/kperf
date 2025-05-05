@@ -1,0 +1,26 @@
+count: 10
+loadProfile:
+  version: 1
+  description: "list configmaps"
+  spec:
+    rate: 10
+    conns: 10
+    client: 10
+    contentType: json
+    disableHTTP2: false
+    maxRetries: 0
+    requests:
+      - staleList:
+          version: v1
+          resource: configmaps
+        shares: 1000 # chance 1000 / (1000 + 100 + 100)
+      - quorumList:
+          version: v1
+          resource: configmaps
+          limit: 1000
+        shares: 100 # chance 100 / (1000 + 100 + 100)
+      - quorumList:
+          version: v1
+          resource: configmaps
+          limit: 1000
+        shares: 100 # chance 100 / (1000 + 100 + 100)

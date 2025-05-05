@@ -482,3 +482,33 @@ func CreateTempFileWithContent(data []byte) (_name string, _cleanup func() error
 		return os.RemoveAll(fName)
 	}, nil
 }
+
+// Creates configmaps for benchmark.
+func CreateConfigmaps(ctx context.Context, kubeCfgPath string,
+	cmAmount int, cmSize int, cmGroupSize int, namespace string, timeout time.Duration) error {
+	args := []string{"data", "configmap"}
+	if kubeCfgPath != "" {
+		args = append(args, fmt.Sprintf("--kubeconfig=%s", kubeCfgPath))
+	}
+	args = append(args, fmt.Sprintf("--namespace=%s", namespace), "add", "runkperf-bench")
+	args = append(args, fmt.Sprintf("--total=%d", cmAmount))
+	args = append(args, fmt.Sprintf("--size=%d", cmSize))
+	args = append(args, fmt.Sprintf("--group-size=%d", cmGroupSize))
+
+	_, err := runCommand(ctx, timeout, "runkperf", args)
+	return err
+
+}
+
+// Delete configmaps for benchmark.
+func DeleteConfigmaps(ctx context.Context, kubeCfgPath string, namespace string, timeout time.Duration) error {
+	args := []string{"data", "configmap"}
+	if kubeCfgPath != "" {
+		args = append(args, "--kubeconfig=%s", kubeCfgPath)
+	}
+	args = append(args, fmt.Sprintf("--namespace=%s", namespace), "delete", "runkperf-bench")
+
+	_, err := runCommand(ctx, timeout, "runkperf", args)
+	return err
+
+}
