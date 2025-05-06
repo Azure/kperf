@@ -42,8 +42,8 @@ The test suite is to generate configmaps in a namespace and list them. The load 
 			Value: 0,
 		},
 		cli.IntFlag{
-			Name:  "total-time",
-			Usage: "Total time to run the benchmark. Unit is Sec. It will be ignored if --total is set.",
+			Name:  "duration-sec",
+			Usage: "Duration of the benchmark in seconds. It will be ignored if --total is set.",
 			Value: 0,
 		},
 	},
@@ -99,11 +99,11 @@ func benchListConfigmapsRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport
 	dpCtx, dpCancel := context.WithCancel(ctx)
 	defer dpCancel()
 
-	totalTime := cliCtx.Duration("total-time")
-	if totalTime != 0 {
+	duration := cliCtx.Duration("duration-sec")
+	if duration != 0 {
 		log.GetLogger(dpCtx).
 			WithKeyValues("level", "info").
-			LogKV("msg", fmt.Sprintf("Running for %v seconds", totalTime.Seconds()))
+			LogKV("msg", fmt.Sprintf("Running for %v seconds", duration.Seconds()))
 	}
 
 	rgResult, derr := utils.DeployRunnerGroup(ctx,
@@ -128,7 +128,7 @@ Workload: List all configmaps in the namespace and get the percentile latency.`,
 		Result:   *rgResult,
 		Info: map[string]interface{}{
 			"configmapSizeInBytes": cmSize,
-			"runningTime":          totalTime.String(),
+			"runningTime":          duration.String(),
 		},
 	}, nil
 }

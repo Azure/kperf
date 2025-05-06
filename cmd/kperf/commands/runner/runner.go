@@ -89,8 +89,8 @@ var runCommand = cli.Command{
 			Usage: "show raw letencies data in result",
 		},
 		cli.IntFlag{
-			Name:  "total-time",
-			Usage: "Total time for runner to run. Unit is Sec. It will be ignored if --total is set.",
+			Name:  "duration-sec",
+			Usage: "Duration of the benchmark in seconds. It will be ignored if --total is set.",
 			Value: 0,
 		},
 	},
@@ -175,11 +175,11 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 		profileCfg.Spec.Client = cliCtx.Int(v)
 	}
 	if v := "total"; !cliCtx.IsSet(v) && profileCfg.Spec.Total == 0 {
-		if v := "total-time"; cliCtx.IsSet(v) {
-			profileCfg.Spec.TotalTime = cliCtx.Int(v)
+		if v := "duration"; cliCtx.IsSet(v) {
+			profileCfg.Spec.Duration = cliCtx.Int(v)
 		}
-		if profileCfg.Spec.TotalTime > 0 {
-			// Setting Total to -1 to indicate that TotalTime is being used
+		if profileCfg.Spec.Duration > 0 {
+			// Setting Total to -1 to indicate that Duration is being used
 			profileCfg.Spec.Total = -1
 		}
 	}
