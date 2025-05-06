@@ -174,17 +174,14 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 	if v := "client"; cliCtx.IsSet(v) || profileCfg.Spec.Client == 0 {
 		profileCfg.Spec.Client = cliCtx.Int(v)
 	}
-	if v := "total"; !cliCtx.IsSet(v) && profileCfg.Spec.Total == 0 {
-		if v := "duration"; cliCtx.IsSet(v) {
-			profileCfg.Spec.Duration = cliCtx.Int(v)
-		}
-		if profileCfg.Spec.Duration > 0 {
-			// Setting Total to -1 to indicate that Duration is being used
-			profileCfg.Spec.Total = -1
-		}
-	}
-	if v := "total"; cliCtx.IsSet(v) || profileCfg.Spec.Total == 0 {
+	if v := "total"; cliCtx.IsSet(v) {
 		profileCfg.Spec.Total = cliCtx.Int(v)
+	}
+	if v := "duration"; cliCtx.IsSet(v) {
+		profileCfg.Spec.Duration = cliCtx.Int(v)
+	}
+	if profileCfg.Spec.Total == 0 && profileCfg.Spec.Duration == 0 {
+		profileCfg.Spec.Total = cliCtx.Int("total")
 	}
 	if v := "content-type"; cliCtx.IsSet(v) || profileCfg.Spec.ContentType == "" {
 		profileCfg.Spec.ContentType = types.ContentType(cliCtx.String(v))
