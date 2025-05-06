@@ -39,7 +39,7 @@ The test suite is to generate configmaps in a namespace and list them. The load 
 		cli.IntFlag{
 			Name:  "total",
 			Usage: "Total requests per runner (There are 10 runners totally and runner's rate is 10)",
-			Value: 0,
+			Value: 1000,
 		},
 		cli.IntFlag{
 			Name:  "duration-sec",
