@@ -35,7 +35,7 @@ import (
 // Maybe we can consider to contribute to difference cloud providers with
 // workaround. For example, if node.Spec.ProviderID contains `?ignore=virtual`,
 // the cloud providers should ignore this kind of nodes.
-func CreateNodepool(ctx context.Context, kubeCfgPath string, nodepoolName string, opts ...NodepoolOpt) (retErr error) {
+func CreateNodepool(ctx context.Context, kubeCfgPath string, nodepoolName string, timeout time.Duration, opts ...NodepoolOpt) (retErr error) {
 	cfg := defaultNodepoolCfg
 	for _, opt := range opts {
 		opt(&cfg)
@@ -56,7 +56,7 @@ func CreateNodepool(ctx context.Context, kubeCfgPath string, nodepoolName string
 		return fmt.Errorf("nodepool %s already exists", cfg.nodeHelmReleaseName())
 	}
 
-	cleanupFn, err := createNodepoolController(ctx, kubeCfgPath, &cfg)
+	cleanupFn, err := createNodepoolController(ctx, kubeCfgPath, &cfg, timeout)
 	if err != nil {
 		return err
 	}
@@ -89,11 +89,11 @@ func CreateNodepool(ctx context.Context, kubeCfgPath string, nodepoolName string
 	if err != nil {
 		return fmt.Errorf("failed to create helm release client: %w", err)
 	}
-	return releaseCli.Deploy(ctx, 30*time.Minute)
+	return releaseCli.Deploy(ctx, timeout)
 }
 
 // createNodepoolController creates node controller release.
-func createNodepoolController(ctx context.Context, kubeCfgPath string, cfg *nodepoolConfig) (_cleanup func() error, _ error) {
+func createNodepoolController(ctx context.Context, kubeCfgPath string, cfg *nodepoolConfig, timeout time.Duration) (_cleanup func() error, _ error) {
 	ch, err := manifests.LoadChart(virtualnodeControllerChartName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load virtual node controller chart: %w", err)
@@ -116,7 +116,7 @@ func createNodepoolController(ctx context.Context, kubeCfgPath string, cfg *node
 		return nil, fmt.Errorf("failed to create helm release client: %w", err)
 	}
 
-	if err := releaseCli.Deploy(ctx, 30*time.Minute); err != nil {
+	if err := releaseCli.Deploy(ctx, timeout); err != nil {
 		return nil, fmt.Errorf("failed to deploy virtual node controller: %w", err)
 	}
 	return releaseCli.Uninstall, nil

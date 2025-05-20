@@ -22,6 +22,9 @@ func NewKperfRunner(kubeCfgPath string, runnerImage string) *KperfRunner {
 	}
 }
 
+// Default timeout for kperf to create virtual nodepool.
+const DefaultVcTimeout = 30 * time.Minute
+
 // NewNodepool creates new virtual nodepool.
 func (kr *KperfRunner) NewNodepool(
 	ctx context.Context,
@@ -29,6 +32,7 @@ func (kr *KperfRunner) NewNodepool(
 	name string, nodes int, cpu, memory, maxPods int,
 	affinity string,
 	sharedProviderID string,
+	vcTimeout time.Duration,
 ) error {
 	args := []string{"vc", "nodepool"}
 	if kr.kubeCfgPath != "" {
@@ -39,6 +43,7 @@ func (kr *KperfRunner) NewNodepool(
 		fmt.Sprintf("--cpu=%v", cpu),
 		fmt.Sprintf("--memory=%v", memory),
 		fmt.Sprintf("--max-pods=%v", maxPods),
+		fmt.Sprintf("--timeout=%v", int(vcTimeout.Minutes())),
 	)
 	if affinity != "" {
 		args = append(args, fmt.Sprintf("--affinity=%v", affinity))

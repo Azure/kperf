@@ -220,7 +220,7 @@ func deployWarmupVirtualNodepool(ctx context.Context, kubeCfgPath string, isEKS 
 		warnLogger.LogKV("msg", "failed to delete", "nodepool", target, "error", err)
 	}
 
-	err = kr.NewNodepool(ctx, 0, target, 100, 32, 96, 110, nodeAffinity, sharedProviderID)
+	err = kr.NewNodepool(ctx, 0, target, 100, 32, 96, 110, nodeAffinity, sharedProviderID, utils.DefaultVcTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nodepool %s: %w", target, err)
 	}

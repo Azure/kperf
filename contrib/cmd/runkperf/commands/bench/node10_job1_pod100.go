@@ -57,6 +57,7 @@ func benchNode10Job1Pod100CaseRun(cliCtx *cli.Context) (*internaltypes.Benchmark
 		cliCtx.Int("cpu"),
 		cliCtx.Int("memory"),
 		cliCtx.Int("max-pods"),
+		utils.DefaultVcTimeout,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deploy virtual node: %w", err)
