@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+	"time"
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/virtualcluster"
@@ -72,6 +73,11 @@ var nodepoolAddCommand = cli.Command{
 			Usage:  "Force all the virtual nodes using one provider ID",
 			Hidden: true,
 		},
+		cli.IntFlag{
+			Name:  "timeout",
+			Usage: "Timeout for creating node pool, in minutes",
+			Value: 30,
+		},
 	},
 	Action: func(cliCtx *cli.Context) error {
 		if cliCtx.NArg() != 1 {
@@ -102,6 +108,7 @@ var nodepoolAddCommand = cli.Command{
 		return virtualcluster.CreateNodepool(context.Background(),
 			kubeCfgPath,
 			nodepoolName,
+			time.Duration(cliCtx.Int("timeout"))*time.Minute,
 			virtualcluster.WithNodepoolCPUOpt(cliCtx.Int("cpu")),
 			virtualcluster.WithNodepoolMemoryOpt(cliCtx.Int("memory")),
 			virtualcluster.WithNodepoolCountOpt(cliCtx.Int("nodes")),

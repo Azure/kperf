@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/Azure/kperf/api/types"
 	kperfcmdutils "github.com/Azure/kperf/cmd/kperf/commands/utils"
@@ -97,7 +98,7 @@ func renderBenchmarkReportInterceptor(handler subcmdActionFunc) subcmdActionFunc
 }
 
 // deployVirtualNodepool deploys virtual nodepool.
-func deployVirtualNodepool(ctx context.Context, cliCtx *cli.Context, target string, nodes, cpu, memory, maxPods int) (func() error, error) {
+func deployVirtualNodepool(ctx context.Context, cliCtx *cli.Context, target string, nodes, cpu, memory, maxPods int, vcTimeout time.Duration) (func() error, error) {
 	log.GetLogger(ctx).
 		WithKeyValues("level", "info").
 		LogKV("msg", "deploying virtual nodepool", "name", target)
@@ -127,7 +128,7 @@ func deployVirtualNodepool(ctx context.Context, cliCtx *cli.Context, target stri
 			LogKV("msg", "failed to delete nodepool", "name", target, "error", err)
 	}
 
-	err = kr.NewNodepool(ctx, 0, target, nodes, cpu, memory, maxPods, virtualNodeAffinity, sharedProviderID)
+	err = kr.NewNodepool(ctx, 0, target, nodes, cpu, memory, maxPods, virtualNodeAffinity, sharedProviderID, vcTimeout)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create nodepool %s: %w", target, err)
 	}
