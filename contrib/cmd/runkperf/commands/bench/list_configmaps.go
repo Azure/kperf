@@ -42,7 +42,7 @@ The test suite is to generate configmaps in a namespace and list them. The load 
 			Value: 1000,
 		},
 		cli.IntFlag{
-			Name:  "duration-sec",
+			Name:  "duration",
 			Usage: "Duration of the benchmark in seconds. It will be ignored if --total is set.",
 			Value: 0,
 		},
