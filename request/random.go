@@ -79,7 +79,10 @@ func (r *WeightedRandomRequests) Run(ctx context.Context, total int) {
 	r.wg.Add(1)
 
 	sum := 0
-	for sum < total {
+	for {
+		if total > 0 && sum >= total {
+			break
+		}
 		builder := r.randomPick()
 		select {
 		case r.reqBuilderCh <- builder:

@@ -99,7 +99,7 @@ func benchListConfigmapsRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport
 	dpCtx, dpCancel := context.WithCancel(ctx)
 	defer dpCancel()
 
-	duration := cliCtx.Duration("duration-sec")
+	duration := cliCtx.Duration("duration")
 	if duration != 0 {
 		log.GetLogger(dpCtx).
 			WithKeyValues("level", "info").

@@ -180,7 +180,12 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 	if v := "duration"; cliCtx.IsSet(v) {
 		profileCfg.Spec.Duration = cliCtx.Int(v)
 	}
+	if profileCfg.Spec.Total > 0 && profileCfg.Spec.Duration > 0 {
+		profileCfg.Spec.Duration = 0
+		fmt.Printf("Warning: both total:%v and duration:%v are set, duration will be ignored\n", profileCfg.Spec.Total, profileCfg.Spec.Duration)
+	}
 	if profileCfg.Spec.Total == 0 && profileCfg.Spec.Duration == 0 {
+		// Use default total value
 		profileCfg.Spec.Total = cliCtx.Int("total")
 	}
 	if v := "content-type"; cliCtx.IsSet(v) || profileCfg.Spec.ContentType == "" {

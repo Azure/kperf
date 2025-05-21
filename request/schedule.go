@@ -126,13 +126,14 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 
 	start := time.Now()
 
-	if spec.Total > 0 {
-		// If total is set, we will run for total requests.
-		// Otherwise, we will run for total time.
-		rndReqs.Run(ctx, spec.Total)
-	} else if spec.Duration > 0 {
-		rndReqs.RunForDuration(ctx, time.Duration(spec.Duration)*time.Second)
+	if spec.Duration > 0 {
+		// If duration is set, we will run for duration.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(spec.Duration)*time.Second)
+		defer cancel()
 	}
+	rndReqs.Run(ctx, spec.Total)
+
 	rndReqs.Stop()
 	wg.Wait()
 

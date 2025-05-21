@@ -150,8 +150,9 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 			if reqs < 0 {
 				return fmt.Errorf("invalid total-requests value: %v", reqs)
 			}
-			reqsTime := cliCtx.Int("duration-sec")
-			if reqs == 0 && reqsTime != 0 {
+			reqsTime := cliCtx.Int("duration")
+			if !cliCtx.IsSet("total") && reqsTime > 0 {
+				reqs = 0
 				spec.Profile.Spec.Duration = reqsTime
 			}
 
