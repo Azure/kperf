@@ -89,7 +89,7 @@ var runCommand = cli.Command{
 			Usage: "show raw letencies data in result",
 		},
 		cli.IntFlag{
-			Name:  "duration-sec",
+			Name:  "duration",
 			Usage: "Duration of the benchmark in seconds. It will be ignored if --total is set.",
 			Value: 0,
 		},
