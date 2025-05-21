@@ -182,7 +182,7 @@ func (spec LoadProfileSpec) Validate() error {
 	}
 
 	if spec.Total <= 0 && spec.Duration <= 0 {
-		return fmt.Errorf("total requires > 0: %v", spec.Total)
+		return fmt.Errorf("total requires > 0: %v or duration > 0s: %v", spec.Total, spec.Duration)
 	}
 
 	if spec.Client <= 0 {
