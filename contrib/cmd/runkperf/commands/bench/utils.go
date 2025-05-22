@@ -150,6 +150,11 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 			if reqs < 0 {
 				return fmt.Errorf("invalid total-requests value: %v", reqs)
 			}
+			reqsTime := cliCtx.Int("duration")
+			if !cliCtx.IsSet("total") && reqsTime > 0 {
+				reqs = 0
+				spec.Profile.Spec.Duration = reqsTime
+			}
 
 			rgAffinity := cliCtx.GlobalString("rg-affinity")
 			affinityLabels, err := kperfcmdutils.KeyValuesMap([]string{rgAffinity})

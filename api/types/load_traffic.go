@@ -41,6 +41,8 @@ type LoadProfileSpec struct {
 	Rate float64 `json:"rate" yaml:"rate"`
 	// Total defines the total number of requests.
 	Total int `json:"total" yaml:"total"`
+	// Duration defines the running time in seconds.
+	Duration int `json:"duration" yaml:"duration"`
 	// Conns defines total number of long connections used for traffic.
 	Conns int `json:"conns" yaml:"conns"`
 	// Client defines total number of HTTP clients.
@@ -179,8 +181,8 @@ func (spec LoadProfileSpec) Validate() error {
 		return fmt.Errorf("rate requires >= 0: %v", spec.Rate)
 	}
 
-	if spec.Total <= 0 {
-		return fmt.Errorf("total requires > 0: %v", spec.Total)
+	if spec.Total <= 0 && spec.Duration <= 0 {
+		return fmt.Errorf("total requires > 0: %v or duration > 0s: %v", spec.Total, spec.Duration)
 	}
 
 	if spec.Client <= 0 {
