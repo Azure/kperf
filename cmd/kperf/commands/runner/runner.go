@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/metrics"
 	"github.com/Azure/kperf/request"
+	"k8s.io/klog/v2"
 
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
@@ -181,8 +182,8 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 		profileCfg.Spec.Duration = cliCtx.Int(v)
 	}
 	if profileCfg.Spec.Total > 0 && profileCfg.Spec.Duration > 0 {
+		klog.Warningf("both total:%v and duration:%v are set, duration will be ignored\n", profileCfg.Spec.Total, profileCfg.Spec.Duration)
 		profileCfg.Spec.Duration = 0
-		fmt.Printf("Warning: both total:%v and duration:%v are set, duration will be ignored\n", profileCfg.Spec.Total, profileCfg.Spec.Duration)
 	}
 	if profileCfg.Spec.Total == 0 && profileCfg.Spec.Duration == 0 {
 		// Use default total value
