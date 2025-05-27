@@ -299,7 +299,7 @@ func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName 
 					"app":     appLebel,
 					"cmName":  cmName,
 				}
-				data, err := randString(size)
+				data, err := randString(size * 1024)
 				if err != nil {
 					return fmt.Errorf("failed to generate random string for configmap %s: %v", name, err)
 				}
