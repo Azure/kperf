@@ -50,7 +50,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        image: registry.k8s.io/kwok/kwok:v0.5.1
+        image: registry.k8s.io/kwok/kwok:v0.7.0
         imagePullPolicy: IfNotPresent
         name: kwok-controller
         volumeMounts:

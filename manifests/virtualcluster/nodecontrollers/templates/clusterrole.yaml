@@ -57,3 +57,22 @@ rules:
       - watch
       - list
       - get
+  - apiGroups:
+    - kwok.x-k8s.io
+    resources:
+    - stages
+    verbs:
+    - create
+    - delete
+    - get
+    - list
+    - patch
+    - update
+    - watch
+  - apiGroups:
+    - kwok.x-k8s.io
+    resources:
+    - stages/status
+    verbs:
+    - patch
+    - update
