@@ -14,31 +14,42 @@ spec:
       operator: 'In'
       values:
       - 'Running'
+    - key: '.status.conditions.[] | select( .type == "Ready" ) | .status'
+      operator: 'In'
+      values:
+      - 'True'
     - key: '.metadata.ownerReferences.[].kind'
       operator: 'In'
       values:
       - 'Job'
   weight: 1
+  weightFrom:
+    expressionFrom: '.metadata.annotations["pod-complete.stage.kwok.x-k8s.io/weight"]'
   delay:
     durationMilliseconds: 1000
+    durationFrom:
+      expressionFrom: '.metadata.annotations["pod-complete.stage.kwok.x-k8s.io/delay"]'
     jitterDurationMilliseconds: 5000
+    jitterDurationFrom:
+      expressionFrom: '.metadata.annotations["pod-complete.stage.kwok.x-k8s.io/jitter-delay"]'
   next:
+    delete: false
     statusTemplate: |
-      {{ `{{ $now := Now }}` }}
-      {{ `{{ $root := . }}` }}
+      {{ $now := Now }}
+      {{ $root := . }}
       containerStatuses:
-      {{ `{{ range $index, $item := .spec.containers }}` }}
-      {{ `{{ $origin := index $root.status.containerStatuses $index }}` }}
-      - image: {{ `{{ $item.image | Quote }}` }}
-        name: {{ `{{ $item.name | Quote }}` }}
-        ready: false
+      {{ range $index, $item := .spec.containers }}
+      {{ $origin := index $root.status.containerStatuses $index }}
+      - image: {{ $item.image | Quote }}
+        name: {{ $item.name | Quote }}
+        ready: true
         restartCount: 0
         started: false
         state:
           terminated:
             exitCode: 0
-            finishedAt: {{ `{{ $now | Quote }}` }}
+            finishedAt: {{ $now | Quote }}
             reason: Completed
-            startedAt: {{ `{{ $now | Quote }}` }}
-      {{ `{{ end }}` }}
+            startedAt: {{ $now | Quote }}
+      {{ end }}
       phase: Succeeded

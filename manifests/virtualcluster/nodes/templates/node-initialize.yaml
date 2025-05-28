@@ -14,66 +14,66 @@ spec:
       - 'True'
   next:
     statusTemplate: |
-      {{ `{{ $now := Now }}` }}
-      {{ `{{ $lastTransitionTime := or .metadata.creationTimestamp $now }}` }}
+      {{ $now := Now }}
+      {{ $lastTransitionTime := or .metadata.creationTimestamp $now }}
       conditions:
-      {{ `{{ range NodeConditions }}` }}
-      - lastHeartbeatTime: {{ `{{ $now | Quote }}` }}
-        lastTransitionTime: {{ `{{ $lastTransitionTime | Quote }}` }}
-        message: {{ `{{ .message | Quote }}` }}
-        reason: {{ `{{ .reason | Quote }}` }}
-        status: {{ `{{ .status | Quote }}` }}
-        type: {{ `{{ .type  | Quote}}` }}
-      {{ `{{ end }}` }}
+      {{ range NodeConditions }}
+      - lastHeartbeatTime: {{ $now | Quote }}
+        lastTransitionTime: {{ $lastTransitionTime | Quote }}
+        message: {{ .message | Quote }}
+        reason: {{ .reason | Quote }}
+        status: {{ .status | Quote }}
+        type: {{ .type  | Quote}}
+      {{ end }}
 
       addresses:
-      {{ `{{ with .status.addresses }}` }}
-      {{ `{{ YAML . 1 }}` }}
-      {{ `{{ else }}` }}
-      {{ `{{ with NodeIP }}` }}
-      - address: {{ `{{ . | Quote }}` }}
+      {{ with .status.addresses }}
+      {{ YAML . 1 }}
+      {{ else }}
+      {{ with NodeIP }}
+      - address: {{ . | Quote }}
         type: InternalIP
-      {{ `{{ end }}` }}
-      {{ `{{ with NodeName }}` }}
-      - address: {{ `{{ . | Quote }}` }}
+      {{ end }}
+      {{ with NodeName }}
+      - address: {{ . | Quote }}
         type: Hostname
-      {{ `{{ end }}` }}
-      {{ `{{ end }}` }}
+      {{ end }}
+      {{ end }}
 
-      {{ `{{ with NodePort }}` }}
+      {{ with NodePort }}
       daemonEndpoints:
         kubeletEndpoint:
-          Port: {{ `{{ . }}` }}
-      {{ `{{ end }}` }}
+          Port: {{ . }}
+      {{ end }}
 
       allocatable:
-      {{ `{{ with .status.allocatable }}` }}
-      {{ `{{ YAML . 1 }}` }}
-      {{ `{{ else }}` }}
+      {{ with .status.allocatable }}
+      {{ YAML . 1 }}
+      {{ else }}
         cpu: 1k
         memory: 1Ti
         pods: 1M
-      {{ `{{ end }}` }}
+      {{ end }}
       capacity:
-      {{ `{{ with .status.capacity }}` }}
-      {{ `{{ YAML . 1 }}` }}
-      {{ `{{ else }}` }}
+      {{ with .status.capacity }}
+      {{ YAML . 1 }}
+      {{ else }}
         cpu: 1k
         memory: 1Ti
         pods: 1M
-      {{ `{{ end }}` }}
+      {{ end }}
 
-      {{ `{{ $nodeInfo := .status.nodeInfo }}` }}
-      {{ `{{ $kwokVersion := printf "kwok-%s" Version }}` }}
+      {{ $nodeInfo := .status.nodeInfo }}
+      {{ $kwokVersion := printf "kwok-%s" Version }}
       nodeInfo:
-        architecture: {{ `{{ or $nodeInfo.architecture "amd64" }}` }}
-        bootID: {{ `{{ or $nodeInfo.bootID "\"\"" }}` }}
-        containerRuntimeVersion: {{ `{{ or $nodeInfo.containerRuntimeVersion $kwokVersion }}` }}
-        kernelVersion: {{ `{{ or $nodeInfo.kernelVersion $kwokVersion }}` }}
-        kubeProxyVersion: {{ `{{ or $nodeInfo.kubeProxyVersion $kwokVersion }}` }}
-        kubeletVersion: {{ `{{ or $nodeInfo.kubeletVersion $kwokVersion }}` }}
-        machineID: {{ `{{ or $nodeInfo.machineID "\"\"" }}` }}
-        operatingSystem: {{ `{{ or $nodeInfo.operatingSystem "linux" }}` }}
-        osImage: {{ `{{ or $nodeInfo.osImage "\"\"" }}` }}
-        systemUUID: {{ `{{ or $nodeInfo.systemUUID "\"\"" }}` }}
+        architecture: {{ or $nodeInfo.architecture "amd64" }}
+        bootID: {{ or $nodeInfo.bootID `""` }}
+        containerRuntimeVersion: {{ or $nodeInfo.containerRuntimeVersion $kwokVersion }}
+        kernelVersion: {{ or $nodeInfo.kernelVersion $kwokVersion }}
+        kubeProxyVersion: {{ or $nodeInfo.kubeProxyVersion $kwokVersion }}
+        kubeletVersion: {{ or $nodeInfo.kubeletVersion $kwokVersion }}
+        machineID: {{ or $nodeInfo.machineID `""` }}
+        operatingSystem: {{ or $nodeInfo.operatingSystem "linux" }}
+        osImage: {{ or $nodeInfo.osImage `""` }}
+        systemUUID: {{ or $nodeInfo.systemUUID `""` }}
       phase: Running
