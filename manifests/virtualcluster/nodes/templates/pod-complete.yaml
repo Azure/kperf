@@ -35,21 +35,21 @@ spec:
   next:
     delete: false
     statusTemplate: |
-      {{ $now := Now }}
-      {{ $root := . }}
+      {{ `{{ $now := Now }}` }}
+      {{ `{{ $root := . }}` }}
       containerStatuses:
-      {{ range $index, $item := .spec.containers }}
-      {{ $origin := index $root.status.containerStatuses $index }}
-      - image: {{ $item.image | Quote }}
-        name: {{ $item.name | Quote }}
+      {{ `{{ range $index, $item := .spec.containers }}` }}
+      {{ `{{ $origin := index $root.status.containerStatuses $index }}` }}
+      - image: {{ `{{ $item.image | Quote }}` }}
+        name: {{ `{{ $item.name | Quote }}` }}
         ready: true
         restartCount: 0
         started: false
         state:
           terminated:
             exitCode: 0
-            finishedAt: {{ $now | Quote }}
+            finishedAt: {{ `{{ $now | Quote }}` }}
             reason: Completed
-            startedAt: {{ $now | Quote }}
-      {{ end }}
+            startedAt: {{ `{{ $now | Quote }}` }}
+      {{ `{{ end }}` }}
       phase: Succeeded

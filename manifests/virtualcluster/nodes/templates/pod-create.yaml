@@ -28,77 +28,77 @@ spec:
       reason: Created
       message: Created container
     statusTemplate: |
-      {{ $now := Now }}
+      {{ `{{ $now := Now }}` }}
 
       conditions:
-      {{ if .spec.initContainers }}
+      {{ `{{ if .spec.initContainers }}` }}
       - lastProbeTime: null
-        lastTransitionTime: {{ $now | Quote }}
-        message: 'containers with incomplete status: [{{ range .spec.initContainers }} {{ .name }} {{ end }}]'
+        lastTransitionTime: {{ `{{ $now | Quote }}` }}
+        message: 'containers with incomplete status: [{{ `{{ range .spec.initContainers }}` }} {{ `{{ .name }}` }} {{ `{{ end }}` }}]'
         reason: ContainersNotInitialized
         status: "False"
         type: Initialized
-      {{ else }}
+      {{ `{{ else }}` }}
       - lastProbeTime: null
-        lastTransitionTime: {{ $now | Quote }}
+        lastTransitionTime: {{ `{{ $now | Quote }}` }}
         status: "True"
         type: Initialized
-      {{ end }}
+      {{ `{{ end }}` }}
       - lastProbeTime: null
-        lastTransitionTime: {{ $now | Quote }}
-        message: 'containers with unready status: [{{ range .spec.containers }} {{ .name }} {{ end }}]'
+        lastTransitionTime: {{ `{{ $now | Quote }}` }}
+        message: 'containers with unready status: [{{ `{{ range .spec.containers }}` }} {{ `{{ .name }}` }} {{ `{{ end }}` }}]'
         reason: ContainersNotReady
         status: "False"
         type: Ready
       - lastProbeTime: null
-        lastTransitionTime: {{ $now | Quote }}
-        message: 'containers with unready status: [{{ range .spec.containers }} {{ .name }} {{ end }}]'
+        lastTransitionTime: {{ `{{ $now | Quote }}` }}
+        message: 'containers with unready status: [{{ `{{ range .spec.containers }}` }} {{ `{{ .name }}` }} {{ `{{ end }}` }}]'
         reason: ContainersNotReady
         status: "False"
         type: ContainersReady
-      {{ range .spec.readinessGates }}
-      - lastTransitionTime: {{ $now | Quote }}
+      {{ `{{ range .spec.readinessGates }}` }}
+      - lastTransitionTime: {{ `{{ $now | Quote }}` }}
         status: "True"
-        type: {{ .conditionType | Quote }}
-      {{ end }}
+        type: {{ `{{ .conditionType | Quote }}` }}
+      {{ `{{ end }}` }}
 
-      {{ if .spec.initContainers }}
+      {{ `{{ if .spec.initContainers }}` }}
       initContainerStatuses:
-      {{ range .spec.initContainers }}
-      - image: {{ .image | Quote }}
-        name: {{ .name | Quote }}
+      {{ `{{ range .spec.initContainers }}` }}
+      - image: {{ `{{ .image | Quote }}` }}
+        name: {{ `{{ .name | Quote }}` }}
         ready: false
         restartCount: 0
         started: false
         state:
           waiting:
             reason: PodInitializing
-      {{ end }}
+      {{ `{{ end }}` }}
       containerStatuses:
-      {{ range .spec.containers }}
-      - image: {{ .image | Quote }}
-        name: {{ .name | Quote }}
+      {{ `{{ range .spec.containers }}` }}
+      - image: {{ `{{ .image | Quote }}` }}
+        name: {{ `{{ .name | Quote }}` }}
         ready: false
         restartCount: 0
         started: false
         state:
           waiting:
             reason: PodInitializing
-      {{ end }}
-      {{ else }}
+      {{ `{{ end }}` }}
+      {{ `{{ else }}` }}
       containerStatuses:
-      {{ range .spec.containers }}
-      - image: {{ .image | Quote }}
-        name: {{ .name | Quote }}
+      {{ `{{ range .spec.containers }}` }}
+      - image: {{ `{{ .image | Quote }}` }}
+        name: {{ `{{ .name | Quote }}` }}
         ready: false
         restartCount: 0
         started: false
         state:
           waiting:
             reason: ContainerCreating
-      {{ end }}
-      {{ end }}
+      {{ `{{ end }}` }}
+      {{ `{{ end }}` }}
 
-      hostIP: {{ NodeIPWith .spec.nodeName | Quote }}
-      podIP: {{ PodIPWith .spec.nodeName ( or .spec.hostNetwork false ) ( or .metadata.uid "" ) ( or .metadata.name "" ) ( or .metadata.namespace "" ) | Quote }}
+      hostIP: {{ `{{ NodeIPWith .spec.nodeName | Quote }}` }}
+      podIP: {{ `{{ PodIPWith .spec.nodeName ( or .spec.hostNetwork false ) ( or .metadata.uid "" ) ( or .metadata.name "" ) ( or .metadata.namespace "" ) | Quote }}` }}
       phase: Pending

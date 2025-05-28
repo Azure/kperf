@@ -32,17 +32,17 @@ spec:
       expressionFrom: '.metadata.annotations["pod-init-container-running.stage.kwok.x-k8s.io/jitter-delay"]'
   next:
     statusTemplate: |
-      {{ $now := Now }}
-      {{ $root := . }}
+      {{ `{{ $now := Now }}` }}
+      {{ `{{ $root := . }}` }}
       initContainerStatuses:
-      {{ range $index, $item := .spec.initContainers }}
-      {{ $origin := index $root.status.initContainerStatuses $index }}
-      - image: {{ $item.image | Quote }}
-        name: {{ $item.name | Quote }}
+      {{ `{{ range $index, $item := .spec.initContainers }}` }}
+      {{ `{{ $origin := index $root.status.initContainerStatuses $index }}` }}
+      - image: {{ `{{ $item.image | Quote }}` }}
+        name: {{ `{{ $item.name | Quote }}` }}
         ready: true
         restartCount: 0
         started: true
         state:
           running:
-            startedAt: {{ $now | Quote }}
-      {{ end }}
+            startedAt: {{ `{{ $now | Quote }}` }}
+      {{ `{{ end }}` }}

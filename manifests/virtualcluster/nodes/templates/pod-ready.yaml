@@ -29,32 +29,32 @@ spec:
   next:
     delete: false
     statusTemplate: |
-      {{ $now := Now }}
-      {{ $root := . }}
+      {{ `{{ $now := Now }}` }}
+      {{ `{{ $root := . }}` }}
       conditions:
       - lastProbeTime: null
-        lastTransitionTime: {{ $now | Quote }}
+        lastTransitionTime: {{ `{{ $now | Quote }}` }}
         message: ''
         reason: ''
         status: "True"
         type: Ready
       - lastProbeTime: null
-        lastTransitionTime: {{ $now | Quote }}
+        lastTransitionTime: {{ `{{ $now | Quote }}` }}
         message: ''
         reason: ''
         status: "True"
         type: ContainersReady
       containerStatuses:
-      {{ range $index, $item := .spec.containers }}
-      {{ $origin := index $root.status.containerStatuses $index }}
-      - image: {{ $item.image | Quote }}
-        name: {{ $item.name | Quote }}
+      {{ `{{ range $index, $item := .spec.containers }}` }}
+      {{ `{{ $origin := index $root.status.containerStatuses $index }}` }}
+      - image: {{ `{{ $item.image | Quote }}` }}
+        name: {{ `{{ $item.name | Quote }}` }}
         ready: true
         restartCount: 0
         started: true
         state:
           running:
-            startedAt: {{ $now | Quote }}
-      {{ end }}
+            startedAt: {{ `{{ $now | Quote }}` }}
+      {{ `{{ end }}` }}
       phase: Running
-      startTime: {{ $now | Quote }}
+      startTime: {{ `{{ $now | Quote }}` }}

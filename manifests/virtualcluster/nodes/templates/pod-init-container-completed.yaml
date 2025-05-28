@@ -28,37 +28,37 @@ spec:
       expressionFrom: '.metadata.annotations["pod-init-container-completed.stage.kwok.x-k8s.io/jitter-delay"]'
   next:
     statusTemplate: |
-      {{ $now := Now }}
-      {{ $root := . }}
+      {{ `{{ $now := Now }}` }}
+      {{ `{{ $root := . }}` }}
       conditions:
       - lastProbeTime: null
-        lastTransitionTime: {{ $now | Quote }}
+        lastTransitionTime: {{ `{{ $now | Quote }}` }}
         status: "True"
         reason: ""
         type: Initialized
       initContainerStatuses:
-      {{ range $index, $item := .spec.initContainers }}
-      {{ $origin := index $root.status.initContainerStatuses $index }}
-      - image: {{ $item.image | Quote }}
-        name: {{ $item.name | Quote }}
+      {{ `{{ range $index, $item := .spec.initContainers }}` }}
+      {{ `{{ $origin := index $root.status.initContainerStatuses $index }}` }}
+      - image: {{ `{{ $item.image | Quote }}` }}
+        name: {{ `{{ $item.name | Quote }}` }}
         ready: true
         restartCount: 0
         started: false
         state:
           terminated:
             exitCode: 0
-            finishedAt: {{ $now | Quote }}
+            finishedAt: {{ `{{ $now | Quote }}` }}
             reason: Completed
-            startedAt: {{ $now | Quote }}
-      {{ end }}
+            startedAt: {{ `{{ $now | Quote }}` }}
+      {{ `{{ end }}` }}
       containerStatuses:
-      {{ range .spec.containers }}
-      - image: {{ .image | Quote }}
-        name: {{ .name | Quote }}
+      {{ `{{ range .spec.containers }}` }}
+      - image: {{ `{{ .image | Quote }}` }}
+        name: {{ `{{ .name | Quote }}` }}
         ready: false
         restartCount: 0
         started: false
         state:
           waiting:
             reason: ContainerCreating
-      {{ end }}
+      {{ `{{ end }}` }}
