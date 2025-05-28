@@ -142,12 +142,12 @@ var nodepoolListCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		return renderRunnerGroups(nodepools)
+		return renderNodepoolList(nodepools)
 
 	},
 }
 
-func renderRunnerGroups(nodepools []*release.Release) error {
+func renderNodepoolList(nodepools []*release.Release) error {
 	tw := tabwriter.NewWriter(os.Stdout, 1, 12, 3, ' ', 0)
 
 	fmt.Fprintln(tw, "NAME\tNODES\tCPU\tMEMORY (GiB)\tMAX PODS\tSTATUS\t")
