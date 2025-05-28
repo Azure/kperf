@@ -18,6 +18,10 @@ spec:
       operator: 'In'
       values:
       - 'Job'
+  weight: 1
+  delay:
+    durationMilliseconds: 1000
+    jitterDurationMilliseconds: 5000
   next:
     statusTemplate: |
       {{ `{{ $now := Now }}` }}

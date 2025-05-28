@@ -12,6 +12,10 @@ spec:
       operator: 'DoesNotExist'
     - key: '.status.podIP'
       operator: 'DoesNotExist'
+  weight: 1
+  delay:
+    durationMilliseconds: 1000
+    jitterDurationMilliseconds: 5000
   next:
     statusTemplate: |
       {{ `{{ $now := Now }}` }}
