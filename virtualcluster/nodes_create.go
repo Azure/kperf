@@ -35,12 +35,15 @@ import (
 // Maybe we can consider to contribute to difference cloud providers with
 // workaround. For example, if node.Spec.ProviderID contains `?ignore=virtual`,
 // the cloud providers should ignore this kind of nodes.
-func CreateNodepool(ctx context.Context, kubeCfgPath string, nodepoolName string, opts ...NodepoolOpt) (retErr error) {
+func CreateNodepool(ctx context.Context, kubeCfgPath string, nodepoolName string, npIndex int, opts ...NodepoolOpt) (retErr error) {
 	cfg := defaultNodepoolCfg
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	cfg.name = nodepoolName
+
+	// Set nodepool name and namespace.
+	cfg.name = fmt.Sprintf("%s-%d", nodepoolName, npIndex)
+	cfg.namespace = fmt.Sprintf("%s-%s-%d", virtualnodeReleaseNamespace, nodepoolName, npIndex)
 
 	if err := cfg.validate(); err != nil {
 		return err
@@ -80,7 +83,7 @@ func CreateNodepool(ctx context.Context, kubeCfgPath string, nodepoolName string
 
 	releaseCli, err := helmcli.NewReleaseCli(
 		kubeCfgPath,
-		virtualnodeReleaseNamespace,
+		cfg.nodeHelmReleaseNamespace(),
 		cfg.nodeHelmReleaseName(),
 		ch,
 		virtualnodeReleaseLabels,
@@ -106,7 +109,7 @@ func createNodepoolController(ctx context.Context, kubeCfgPath string, cfg *node
 
 	releaseCli, err := helmcli.NewReleaseCli(
 		kubeCfgPath,
-		virtualnodeReleaseNamespace,
+		cfg.nodeHelmReleaseNamespace(),
 		cfg.nodeControllerHelmReleaseName(),
 		ch,
 		virtualnodeReleaseLabels,

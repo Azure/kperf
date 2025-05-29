@@ -34,6 +34,9 @@ var nodepoolCommand = cli.Command{
 	},
 }
 
+// nodesThreshold is the maximum number of nodes in one nodepool.
+const NodesPoolThreshold = 300
+
 var nodepoolAddCommand = cli.Command{
 	Name:      "add",
 	Usage:     "Add a virtual node pool",
@@ -99,17 +102,28 @@ var nodepoolAddCommand = cli.Command{
 			return fmt.Errorf("failed to parse node-labels: %w", err)
 		}
 
-		return virtualcluster.CreateNodepool(context.Background(),
-			kubeCfgPath,
-			nodepoolName,
-			virtualcluster.WithNodepoolCPUOpt(cliCtx.Int("cpu")),
-			virtualcluster.WithNodepoolMemoryOpt(cliCtx.Int("memory")),
-			virtualcluster.WithNodepoolCountOpt(cliCtx.Int("nodes")),
-			virtualcluster.WithNodepoolMaxPodsOpt(cliCtx.Int("max-pods")),
-			virtualcluster.WithNodepoolNodeControllerAffinity(affinityLabels),
-			virtualcluster.WithNodepoolLabelsOpt(nodeLabels),
-			virtualcluster.WithNodepoolSharedProviderID(cliCtx.String("shared-provider-id")),
-		)
+		nodeCount := cliCtx.Int("nodes")
+
+		index := 0
+		for ; nodeCount > 0; nodeCount -= min(NodesPoolThreshold, nodeCount) {
+			err := virtualcluster.CreateNodepool(context.Background(),
+				kubeCfgPath,
+				nodepoolName,
+				index,
+				virtualcluster.WithNodepoolCPUOpt(cliCtx.Int("cpu")),
+				virtualcluster.WithNodepoolMemoryOpt(cliCtx.Int("memory")),
+				virtualcluster.WithNodepoolCountOpt(min(NodesPoolThreshold, nodeCount)),
+				virtualcluster.WithNodepoolMaxPodsOpt(cliCtx.Int("max-pods")),
+				virtualcluster.WithNodepoolNodeControllerAffinity(affinityLabels),
+				virtualcluster.WithNodepoolLabelsOpt(nodeLabels),
+				virtualcluster.WithNodepoolSharedProviderID(cliCtx.String("shared-provider-id")),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to create nodepool %s-%d: %w", nodepoolName, index, err)
+			}
+			index++
+		}
+		return nil
 	},
 }
 
@@ -129,7 +143,18 @@ var nodepoolDelCommand = cli.Command{
 
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 
-		return virtualcluster.DeleteNodepool(context.Background(), kubeCfgPath, nodepoolName)
+		npList, err := virtualcluster.ListNodepools(context.Background(), kubeCfgPath, nodepoolName)
+		if err != nil {
+			return fmt.Errorf("failed to list nodepools while deleting nodepools: %w", err)
+		}
+
+		for _, np := range npList {
+			err := virtualcluster.DeleteNodepool(context.Background(), kubeCfgPath, np.Name, np.Namespace)
+			if err != nil {
+				return fmt.Errorf("failed to delete nodepool %s: %w", nodepoolName, err)
+			}
+		}
+		return nil
 	},
 }
 
@@ -138,7 +163,7 @@ var nodepoolListCommand = cli.Command{
 	Usage: "List virtual node pools",
 	Action: func(cliCtx *cli.Context) error {
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		nodepools, err := virtualcluster.ListNodepools(context.Background(), kubeCfgPath)
+		nodepools, err := virtualcluster.ListNodepools(context.Background(), kubeCfgPath, "")
 		if err != nil {
 			return err
 		}

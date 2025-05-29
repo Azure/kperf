@@ -50,6 +50,8 @@ const (
 type nodepoolConfig struct {
 	// name represents the name of node pool.
 	name string
+	// namespace represents the namespace of node controllers.
+	namespace string
 	// count represents the desired number of node.
 	count int
 	// cpu represents a logical CPU resource provided by virtual node.
@@ -96,6 +98,10 @@ func (cfg *nodepoolConfig) validate() error {
 
 func (cfg *nodepoolConfig) nodeHelmReleaseName() string {
 	return cfg.name
+}
+
+func (cfg *nodepoolConfig) nodeHelmReleaseNamespace() string {
+	return cfg.namespace
 }
 
 func (cfg *nodepoolConfig) nodeControllerHelmReleaseName() string {
