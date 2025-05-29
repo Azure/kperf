@@ -13,8 +13,8 @@ import (
 	"helm.sh/helm/v3/pkg/storage/driver"
 )
 
-// DeleteNodepool deletes a node pool with a given name.
-func DeleteNodepool(_ context.Context, kubeconfigPath string, nodepoolName string) error {
+// DeleteNodepool deletes a node pool with the given name in the specified namespace.
+func DeleteNodepool(_ context.Context, kubeconfigPath string, nodepoolName string, ns string) error {
 	cfg := defaultNodepoolCfg
 	cfg.name = nodepoolName
 
@@ -22,7 +22,7 @@ func DeleteNodepool(_ context.Context, kubeconfigPath string, nodepoolName strin
 		return err
 	}
 
-	delCli, err := helmcli.NewDeleteCli(kubeconfigPath, virtualnodeReleaseNamespace)
+	delCli, err := helmcli.NewDeleteCli(kubeconfigPath, ns)
 	if err != nil {
 		return fmt.Errorf("failed to create helm delete client: %w", err)
 	}
