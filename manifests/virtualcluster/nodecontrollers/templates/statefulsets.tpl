@@ -60,7 +60,7 @@ spec:
          limits:
            cpu: "500m"
          requests:
-           cpu: "200m"
+           cpu: "10m"
       restartPolicy: Always
       serviceAccount: {{ .Values.name }}
       serviceAccountName: {{ .Values.name }}
