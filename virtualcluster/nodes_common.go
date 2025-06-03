@@ -57,6 +57,9 @@ const (
 	//
 	// NOTE: Please check the details in ./nodes_create.go.
 	reservedNodepoolSuffixName = "-controller"
+
+	// reservedLifecyclePrefixName is the prefix of lifecycle CRD and definition.
+	reservedLifecyclePrefixName = "lifecycle-"
 )
 
 type nodepoolConfig struct {
