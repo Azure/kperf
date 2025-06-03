@@ -29,7 +29,7 @@ func ListNodepools(_ context.Context, kubeconfigPath string) ([]*release.Release
 	res := make([]*release.Release, 0, len(releases)/2)
 	for idx := range releases {
 		r := releases[idx]
-		if strings.HasSuffix(r.Name, reservedNodepoolSuffixName) {
+		if strings.HasSuffix(r.Name, reservedNodepoolSuffixName) || strings.HasPrefix(r.Name, reservedLifecyclePrefixName) {
 			continue
 		}
 		res = append(res, r)
