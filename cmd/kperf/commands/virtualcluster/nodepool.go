@@ -201,7 +201,7 @@ var nodepoolBatchAddCommand = cli.Command{
 				currentBatchSize = totalNodes - i
 			}
 
-			batchNodepoolName := fmt.Sprintf("%s-batch-%d", nodepoolName, i/batchSize)
+			batchNodepoolName := fmt.Sprintf("%s-%d", nodepoolName, i/batchSize)
 			if err := virtualcluster.CreateNodepool(context.Background(),
 				kubeCfgPath,
 				batchNodepoolName,
