@@ -170,7 +170,7 @@ var nodepoolBatchAddCommand = cli.Command{
 		}
 		nodepoolName := strings.TrimSpace(cliCtx.Args().Get(0))
 		if len(nodepoolName) == 0 {
-			return fmt.Errorf("nodepool name cannot be empty")
+			return fmt.Errorf("nodepool name prefix should not be empty")
 		}
 
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
