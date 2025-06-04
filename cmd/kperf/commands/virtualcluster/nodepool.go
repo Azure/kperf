@@ -36,6 +36,9 @@ var nodepoolCommand = cli.Command{
 	},
 }
 
+// maxNodesPerPool is the maximum number of nodes suggested for a single node pool.
+const maxNodesPerPool = 300
+
 var nodepoolAddCommand = cli.Command{
 	Name:      "add",
 	Usage:     "Add a virtual node pool",
@@ -102,7 +105,7 @@ var nodepoolAddCommand = cli.Command{
 		}
 
 		nodes := cliCtx.Int("nodes")
-		if nodes > 300 {
+		if nodes > maxNodesPerPool {
 			klog.Warningf("Creating a node pool with a large number of nodes may cause performance issues. Consider using batch-add command for large node pools.")
 		}
 
