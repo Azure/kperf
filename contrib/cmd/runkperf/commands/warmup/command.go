@@ -76,6 +76,16 @@ var Command = cli.Command{
 			Usage:  "Indicates the target kubernetes cluster is EKS",
 			Hidden: true,
 		},
+		cli.IntFlag{
+			Name:  "ready-count",
+			Usage: "Indicates how many API servers are considered ready based on the core warm-up threshold.",
+			Value: 1,
+		},
+		cli.IntFlag{
+			Name:  "eks-ready-count",
+			Usage: "Indicates how many API servers are considered ready in EKS cluster based on the core warm-up threshold.",
+			Value: 2,
+		},
 	},
 	Action: func(cliCtx *cli.Context) (retErr error) {
 		ctx := context.Background()
@@ -184,6 +194,8 @@ var Command = cli.Command{
 func isReady(cliCtx *cli.Context, cores map[string]int) bool {
 	target := cliCtx.Int("core-warmup-ready-threshold")
 	isEKS := cliCtx.Bool("eks")
+	readyCount := cliCtx.Int("ready-count")
+	eksReadyCount := cliCtx.Int("eks-ready-count")
 
 	n := 0
 	for _, c := range cores {
@@ -191,7 +203,7 @@ func isReady(cliCtx *cli.Context, cores map[string]int) bool {
 			n++
 		}
 	}
-	return (isEKS && n >= 2) || (!isEKS && n >= 1)
+	return (isEKS && n >= eksReadyCount) || (!isEKS && n >= readyCount)
 }
 
 // deployWarmupVirtualNodepool deploys virtual nodepool.
