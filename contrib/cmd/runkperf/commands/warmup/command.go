@@ -68,7 +68,7 @@ var Command = cli.Command{
 		},
 		cli.IntFlag{
 			Name:  "core-warmup-ready-threshold",
-			Usage: "Indicates the threshold for core during warm-up",
+			Usage: "Indicates the threshold for core during warm-up. To force warm-up regardless of the current API server core status, set this to an intentionally high value, such as 65535.",
 			Value: 8,
 		},
 		cli.BoolFlag{
