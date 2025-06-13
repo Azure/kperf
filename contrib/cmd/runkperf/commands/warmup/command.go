@@ -134,10 +134,10 @@ var Command = cli.Command{
 				infoLogger.LogKV("msg", fmt.Sprintf("apiserver resource is ready: %v", cores))
 				return nil
 			}
+			infoLogger.LogKV("msg", fmt.Sprintf("apiserver cores are not ready: %v, core-warmup-ready-threshold: %d, continue to warmup", cores, cliCtx.Int("core-warmup-ready-threshold")))
 		} else {
 			warnLogger.LogKV("msg", "failed to fetch apiserver cores", "error", ferr)
 		}
-
 		delNP, err := deployWarmupVirtualNodepool(ctx, kubeCfgPath, isEKS, virtualNodeAffinity)
 		if err != nil {
 			return err
