@@ -102,8 +102,9 @@ func benchNode100DeploymentNPod10KRun(cliCtx *cli.Context) (*internaltypes.Bench
 	// NOTE: The name pattern should be aligned with ../../../../internal/manifests/loadprofile/node100_pod10k.yaml.
 	deploymentNamePattern := "benchmark"
 
-	rollingUpdateFn, ruCleanupFn, err := utils.DeployAndRepeatRollingUpdateDeployments(dpCtx,
-		kubeCfgPath, deploymentNamePattern, total, replica, paddingBytes, restartInterval)
+	// TODO(xinwei): Implement batching support for deploying deployments after decoupling it from rolling update logic.
+	ruCleanupFn, err := utils.DeployDeployments(dpCtx,
+		kubeCfgPath, deploymentNamePattern, total, replica, paddingBytes)
 	if err != nil {
 		dpCancel()
 		return nil, fmt.Errorf("failed to setup workload: %w", err)
@@ -129,7 +130,7 @@ func benchNode100DeploymentNPod10KRun(cliCtx *cli.Context) (*internaltypes.Bench
 		//
 		// DeployRunnerGroup should return ready notification.
 		// The rolling update should run after runners.
-		rollingUpdateFn()
+		utils.RollingUpdateDeployments(dpCtx, total, deploymentNamePattern, kubeCfgPath, restartInterval)
 	}()
 
 	rgResult, derr := utils.DeployRunnerGroup(ctx,
