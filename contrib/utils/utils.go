@@ -170,6 +170,7 @@ func DeployDeployments(
 
 	return cleanupFn, nil
 }
+
 func RollingUpdateDeployments(ctx context.Context, total int, namePattern string, kubeCfgPath string, internal time.Duration) {
 	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
 	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
