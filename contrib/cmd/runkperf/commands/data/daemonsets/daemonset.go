@@ -1,0 +1,351 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License.
+
+package daemonsets
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"strings"
+	"text/tabwriter"
+
+	"github.com/Azure/kperf/cmd/kperf/commands/utils"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/flowcontrol"
+
+	"github.com/urfave/cli"
+
+	"regexp"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
+
+var Command = cli.Command{
+	Name:      "daemonset",
+	ShortName: "ds",
+	Usage:     "Manage daemonsets",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "kubeconfig",
+			Usage: "Path to the kubeconfig file",
+			Value: utils.DefaultKubeConfigPath,
+		},
+		cli.StringFlag{
+			Name:  "namespace",
+			Usage: "The namespace to create daemonsets in. If not set, the default namespace will be used.",
+			Value: "default",
+		},
+	},
+	Subcommands: []cli.Command{
+		daemonsetAddCommand,
+		daemonsetDelCommand,
+		daemonsetListCommand,
+	},
+}
+
+var daemonsetAddCommand = cli.Command{
+	Name:      "add",
+	Usage:     "Add daemonset",
+	ArgsUsage: "NAME of the daemonset",
+	Flags: []cli.Flag{
+		cli.IntFlag{
+			Name:  "count",
+			Usage: "The value is the number of daemonsets to deploy. Each daemonset will be deployed on all nodes by default, or on specific nodes if the --label is set.",
+			Value: 1,
+		},
+	},
+	Action: func(cliCtx *cli.Context) error {
+		if cliCtx.NArg() != 1 {
+			return fmt.Errorf("required only one argument as daemonsets name prefix: %v", cliCtx.Args())
+		}
+		dsName := strings.TrimSpace(cliCtx.Args().Get(0))
+		if len(dsName) == 0 {
+			return fmt.Errorf("required non-empty daemonset name prefix")
+		}
+
+		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
+		namespace := cliCtx.GlobalString("namespace")
+		count := cliCtx.Int("count")
+
+		if count <= 0 {
+			return fmt.Errorf("count must be greater than 0")
+		}
+
+		err := prepareNamespace(kubeCfgPath, namespace)
+		if err != nil {
+			return err
+		}
+
+		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		if err != nil {
+			return err
+		}
+
+		// Check if the daemonset already exists
+		labelSelector := fmt.Sprintf("app=%s, dsName in (%s)", appLabel, dsName)
+		daemonSets, err := listDaemonsets(clientset, labelSelector, namespace)
+		if len(daemonSets.Items) > 0 {
+			return fmt.Errorf("daemonset with name prefix %s already exists in namespace %s", dsName, namespace)
+		}
+		if err != nil {
+			return fmt.Errorf("failed to list daemonsets: %v while checking for existence", err)
+		}
+
+		// Create the daemonsets
+		err = createDaemonsets(clientset, namespace, dsName, count)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Created %d daemonsets with prefix %s in %s namespace\n", count, dsName, namespace)
+		return nil
+	},
+}
+
+var daemonsetDelCommand = cli.Command{
+	Name:      "delete",
+	ShortName: "del",
+	ArgsUsage: "NAME",
+	Usage:     "Delete a daemonset",
+	Action: func(cliCtx *cli.Context) error {
+		if cliCtx.NArg() != 1 {
+			return fmt.Errorf("required only one argument as daemonset name prefix: %v", cliCtx.Args())
+		}
+		dsName := strings.TrimSpace(cliCtx.Args().Get(0))
+		if len(dsName) == 0 {
+			return fmt.Errorf("required non-empty daemonset name prefix")
+		}
+
+		namespace := cliCtx.GlobalString("namespace")
+		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
+
+		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		if err != nil {
+			return err
+		}
+
+		// Delete each daemonset
+		err = deleteDaemonsets(clientset, namespace, dsName)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("Deleted daemonset %s in %s namespace\n", dsName, namespace)
+		return nil
+
+	},
+}
+
+var appLabel = "fake-pod-daemonset"
+var daemonsetListCommand = cli.Command{
+	Name:      "list",
+	Usage:     "List generated daemonsets",
+	ArgsUsage: "NAME",
+	Action: func(cliCtx *cli.Context) error {
+		namespace := cliCtx.GlobalString("namespace")
+		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
+		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		if err != nil {
+			return err
+		}
+
+		const (
+			minWidth = 1
+			tabWidth = 12
+			padding  = 3
+			padChar  = ' '
+			flags    = 0
+		)
+		tw := tabwriter.NewWriter(os.Stdout, minWidth, tabWidth, padding, padChar, flags)
+		fmt.Fprintln(tw, "NAME\tnamespace\tcount\t")
+
+		labelSelector := fmt.Sprintf("app=%s", appLabel)
+		if cliCtx.NArg() != 0 {
+			args := cliCtx.Args()
+			namesStr := strings.Join(args, ",")
+			labelSelector = fmt.Sprintf("app=%s, dsName in (%s)", appLabel, namesStr)
+		}
+
+		daemonSets, err := listDaemonsets(clientset, labelSelector, namespace)
+		if err != nil {
+			return err
+		}
+
+		if len(daemonSets.Items) == 0 {
+			return tw.Flush()
+		}
+
+		dsName := make(map[string]int)
+
+		for _, ds := range daemonSets.Items {
+			re := regexp.MustCompile(`^(.*)-\d+$`)
+			matches := re.FindStringSubmatch(ds.Name)
+			if len(matches) > 1 {
+				dsName[matches[1]]++
+			} else {
+				dsName[ds.Name]++
+			}
+		}
+		for name, count := range dsName {
+			fmt.Fprintf(tw, "%s\t%s\t%d\t\n",
+				name,
+				namespace,
+				count,
+			)
+		}
+		return tw.Flush()
+	},
+}
+
+func prepareNamespace(kubeCfgPath string, namespace string) error {
+	if namespace == "" {
+		return fmt.Errorf("namespace cannot be empty")
+	}
+
+	if namespace == "default" {
+		return nil
+	}
+
+	clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+	if err != nil {
+		return err
+	}
+
+	_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		// If the namespace already exists, ignore the error
+		if errors.IsAlreadyExists(err) {
+			return nil
+		}
+		return fmt.Errorf("failed to create namespace %s: %v", namespace, err)
+	}
+	return nil
+}
+
+func newClientsetWithRateLimiter(kubeCfgPath string, qps float32, burst int) (*kubernetes.Clientset, error) {
+	config, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
+	if err != nil {
+		return nil, err
+	}
+
+	config.QPS = qps
+	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(qps, burst)
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	return clientset, nil
+}
+
+func createDaemonsets(clientset *kubernetes.Clientset, namespace string, dsName string, count int) error {
+	for i := 0; i < count; i++ {
+		ds := &appsv1.DaemonSet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("%s-%d", dsName, i),
+				Labels: map[string]string{
+					"app":    appLabel,
+					"dsName": dsName,
+					"idx":    fmt.Sprintf("%d", i),
+				},
+				Namespace: namespace,
+			},
+			Spec: appsv1.DaemonSetSpec{
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app":    appLabel,
+						"dsName": dsName,
+						"idx":    fmt.Sprintf("%d", i),
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app":    appLabel,
+							"dsName": dsName,
+							"idx":    fmt.Sprintf("%d", i),
+						},
+					},
+					Spec: corev1.PodSpec{
+						RestartPolicy: corev1.RestartPolicyAlways,
+						Affinity: &corev1.Affinity{
+							NodeAffinity: &corev1.NodeAffinity{
+								RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+									NodeSelectorTerms: []corev1.NodeSelectorTerm{
+										{
+											MatchExpressions: []corev1.NodeSelectorRequirement{
+												{
+													Key:      "type",
+													Operator: corev1.NodeSelectorOpIn,
+													Values:   []string{"kperf-virtualnodes"},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						Tolerations: []corev1.Toleration{
+							{
+								Key:      "kperf.io/nodepool",
+								Operator: corev1.TolerationOpExists,
+								Effect:   corev1.TaintEffectNoSchedule,
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name:  "fake-container",
+								Image: "fake-image",
+							},
+						},
+					},
+				},
+			},
+		}
+
+		_, err := clientset.AppsV1().DaemonSets(namespace).Create(context.TODO(), ds, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Created daemonset %s in namespace %s\n", ds.Name, namespace)
+	}
+	return nil
+}
+
+func deleteDaemonsets(clientset *kubernetes.Clientset, namespace, dsName string) error {
+	// List all daemonsets with the label selector
+	labelSelector := fmt.Sprintf("app=%s, dsName in (%s)", appLabel, dsName)
+	daemonSets, err := listDaemonsets(clientset, labelSelector, namespace)
+	if err != nil {
+		return err
+	}
+
+	if len(daemonSets.Items) == 0 {
+		return fmt.Errorf("no daemonsets found in namespace: %s", namespace)
+	}
+
+	for i := range daemonSets.Items {
+		err := clientset.AppsV1().DaemonSets(namespace).Delete(context.TODO(), daemonSets.Items[i].Name, metav1.DeleteOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			// Ignore not found errors
+			return fmt.Errorf("failed to delete daemonset %s: %v", daemonSets.Items[i].Name, err)
+		}
+	}
+	return nil
+}
+
+func listDaemonsets(clientset *kubernetes.Clientset, labelSelector string, namespace string) (*appsv1.DaemonSetList, error) {
+	daemonSets, err := clientset.AppsV1().DaemonSets(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list daemonsets: %v", err)
+	}
+
+	return daemonSets, nil
+}
