@@ -183,7 +183,7 @@ var daemonsetListCommand = cli.Command{
 		dsName := make(map[string]int)
 
 		for _, ds := range daemonSets.Items {
-			re := regexp.MustCompile(`^(.*)-\d+$`)
+			re := regexp.MustCompile(`^(.*)-\d+$`) // Match the daemonset name pattern like "dsName-0", "dsName-1", etc.
 			matches := re.FindStringSubmatch(ds.Name)
 			if len(matches) > 1 {
 				dsName[matches[1]]++
@@ -274,6 +274,7 @@ func createDaemonsets(clientset *kubernetes.Clientset, namespace string, dsName 
 							"idx":    fmt.Sprintf("%d", i),
 						},
 					},
+					// Set node affinity and tolerations to ensure the pods are scheduled on virtual nodes
 					Spec: corev1.PodSpec{
 						RestartPolicy: corev1.RestartPolicyAlways,
 						Affinity: &corev1.Affinity{
