@@ -55,7 +55,7 @@ var daemonsetAddCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "count",
-			Usage: "The value is the number of daemonsets to deploy. Each daemonset will be deployed on all nodes by default, or on specific nodes if the --label is set.",
+			Usage: "The value is the number of daemonsets to deploy. Each daemonset will be deployed on all virtual nodes by default.",
 			Value: 1,
 		},
 	},
