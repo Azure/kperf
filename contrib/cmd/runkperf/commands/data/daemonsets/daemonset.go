@@ -142,6 +142,7 @@ var daemonsetDelCommand = cli.Command{
 }
 
 var appLabel = "fake-pod-daemonset"
+
 var daemonsetListCommand = cli.Command{
 	Name:      "list",
 	Usage:     "List generated daemonsets",
