@@ -181,18 +181,18 @@ var daemonsetListCommand = cli.Command{
 			return tw.Flush()
 		}
 
-		dsName := make(map[string]int)
+		dsNames := make(map[string]int)
 
 		for _, ds := range daemonSets.Items {
 			re := regexp.MustCompile(`^(.*)-\d+$`) // Match the daemonset name pattern like "dsName-0", "dsName-1", etc.
 			matches := re.FindStringSubmatch(ds.Name)
 			if len(matches) > 1 {
-				dsName[matches[1]]++
+				dsNames[matches[1]]++
 			} else {
-				dsName[ds.Name]++
+				dsNames[ds.Name]++
 			}
 		}
-		for name, count := range dsName {
+		for name, count := range dsNames {
 			fmt.Fprintf(tw, "%s\t%s\t%d\t\n",
 				name,
 				namespace,
