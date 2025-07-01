@@ -86,17 +86,6 @@ var daemonsetAddCommand = cli.Command{
 			return err
 		}
 
-		// Check if the daemonset already exists
-		labelSelector := fmt.Sprintf("app=%s, dsName in (%s)", appLabel, dsName)
-		daemonSets, err := listDaemonsets(clientset, labelSelector, namespace)
-
-		if err != nil {
-			return fmt.Errorf("failed to list daemonsets: %v while checking for existence", err)
-		}
-		if len(daemonSets.Items) > 0 {
-			return fmt.Errorf("daemonset with name prefix %s already exists in namespace %s", dsName, namespace)
-		}
-
 		// Create the daemonsets
 		err = createDaemonsets(clientset, namespace, dsName, count)
 		if err != nil {
