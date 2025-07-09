@@ -1,6 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+// SLI Read Only Benchmark
+// This benchmark is to test the read-only performance of a Kubernetes cluster
+// deploying a job with 1000 pods on 10 virtual nodes.
 package bench
 
 import (
@@ -45,7 +48,7 @@ func benchNode10Job1Pod1kCaseRun(cliCtx *cli.Context) (*internaltypes.BenchmarkR
 	kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 
 	rgCfgFile, rgSpec, rgCfgFileDone, err := newLoadProfileFromEmbed(cliCtx,
-		"loadprofile/read_only_node10_job1_pod1k.yaml")
+		"loadprofile/node10_job1_pod1k.yaml")
 	if err != nil {
 		return nil, err
 	}
@@ -80,9 +83,12 @@ func benchNode10Job1Pod1kCaseRun(cliCtx *cli.Context) (*internaltypes.BenchmarkR
 		cliCtx.GlobalString("runner-flowcontrol"),
 		cliCtx.GlobalString("rg-affinity"),
 	)
-
-	wg.Wait()
 	jobCancel()
+	wg.Wait()
+	
+	
+	
+	
 
 	if derr != nil {
 		return nil, derr
