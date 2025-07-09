@@ -167,6 +167,9 @@ func (b *requestGetBuilder) Build(cli rest.Interface) Requester {
 	} else {
 		comps = append(comps, "apis", b.version.Group, b.version.Version)
 	}
+	if b.namespace != "" {
+		comps = append(comps, "namespaces", b.namespace)
+	}
 	comps = append(comps, b.resource, b.name)
 
 	return &DiscardRequester{
