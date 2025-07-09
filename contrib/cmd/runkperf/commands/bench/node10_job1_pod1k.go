@@ -85,10 +85,6 @@ func benchNode10Job1Pod1kCaseRun(cliCtx *cli.Context) (*internaltypes.BenchmarkR
 	)
 	jobCancel()
 	wg.Wait()
-	
-	
-	
-	
 
 	if derr != nil {
 		return nil, derr

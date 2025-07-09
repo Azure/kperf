@@ -20,4 +20,4 @@ loadProfile:
         namespace: virtualnodes-kperf-io
         name: node10job1pod1k-1
       shares: 100
-    #TODO: Add more resources: jobs, nodes, configmaps .. Vittoria
+    #TODO: Add more resources: jobs, nodes, configmaps ... in  next pr
