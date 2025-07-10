@@ -21,9 +21,8 @@ import (
 var benchNode10Job1Pod1kCase = cli.Command{
 	Name: "node10_job1_pod1k",
 	Usage: `
-
-The test suite is to setup 10 virtual nodes and deploy one job with 100 pods on
-that nodes. It repeats to create and delete job. The load profile is fixed.
+	The test suite is to setup 10 virtual nodes and deploy one job with 1000 pods on
+	that nodes. It repeats to create and delete job. The load profile is fixed.
 	`,
 	Flags: append(
 		[]cli.Flag{
