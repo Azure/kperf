@@ -13,11 +13,11 @@ loadProfile:
         version: v1
         resource: pods
         namespace: job1pod1k
-      shares: 1000
+      shares: 10
     - staleGet:
         version: v1
         resource: pods
         namespace: virtualnodes-kperf-io
         name: node10job1pod1k-1
-      shares: 100
+      shares: 300
     #TODO: Add more resources: jobs, nodes, configmaps ... in  next pr
