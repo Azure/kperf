@@ -39,31 +39,8 @@ var (
 	EKSIdleNodepoolInstanceType = "m4.large"
 )
 
-type DeploymentsTimeout struct {
-	deployTimeout  time.Duration
-	restartTimeout time.Duration
-	rolloutTimeout time.Duration
-}
-type JobsTimeout struct {
-	applyTimeout  time.Duration
-	waitTimeout   time.Duration
-	deleteTimeout time.Duration
-}
-
-var DefaultDeploymentsTimeout = DeploymentsTimeout{
-	deployTimeout:  10 * time.Minute,
-	restartTimeout: 2 * time.Minute,
-	rolloutTimeout: 10 * time.Minute,
-}
-var DefaultJobsTimeout = JobsTimeout{
-	applyTimeout:  5 * time.Minute,
-	waitTimeout:   15 * time.Minute,
-	deleteTimeout: 5 * time.Minute,
-}
-
 // RepeatJobWithPod repeats to deploy 3k pods.
-func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string,
-	target string, internal time.Duration, jobsTimeout JobsTimeout) {
+func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string, target string, internal time.Duration) {
 	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
 	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
 
@@ -108,18 +85,18 @@ func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string,
 
 		time.Sleep(retryInterval)
 
-		aerr := kr.Apply(ctx, jobsTimeout.applyTimeout, jobFile)
+		aerr := kr.Apply(ctx, 5*time.Minute, jobFile)
 		if aerr != nil {
 			warnLogger.LogKV("msg", "failed to apply job, retry after 5 seconds", "job", target, "error", aerr)
 			continue
 		}
 
-		werr := kr.Wait(ctx, jobsTimeout.waitTimeout, "condition=complete", "15m", "job/batchjobs")
+		werr := kr.Wait(ctx, 15*time.Minute, "condition=complete", "15m", "job/batchjobs")
 		if werr != nil {
 			warnLogger.LogKV("msg", "failed to wait job finish", "job", target, "error", werr)
 		}
 
-		derr := kr.Delete(ctx, jobsTimeout.deleteTimeout, jobFile)
+		derr := kr.Delete(ctx, 5*time.Minute, jobFile)
 		if derr != nil {
 			warnLogger.LogKV("msg", "failed to delete job", "job", target, "error", derr)
 		}
@@ -134,7 +111,6 @@ func DeployAndRepeatRollingUpdateDeployments(
 	releaseName string,
 	total, replica, paddingBytes int,
 	internal time.Duration,
-	deploymentsTimeout DeploymentsTimeout,
 ) (rollingUpdateFn, cleanupFn func(), retErr error) {
 	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
 	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
@@ -173,7 +149,7 @@ func DeployAndRepeatRollingUpdateDeployments(
 		"paddingBytes", paddingBytes,
 	)
 
-	err = releaseCli.Deploy(ctx, deploymentsTimeout.deployTimeout)
+	err = releaseCli.Deploy(ctx, 10*time.Minute)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			infoLogger.LogKV("msg", "deploy is canceled")
@@ -211,12 +187,12 @@ func DeployAndRepeatRollingUpdateDeployments(
 				err := func() error {
 					kr := NewKubectlRunner(kubeCfgPath, ns)
 
-					err := kr.DeploymentRestart(ctx, deploymentsTimeout.restartTimeout, name)
+					err := kr.DeploymentRestart(ctx, 2*time.Minute, name)
 					if err != nil {
 						return fmt.Errorf("failed to restart deployment %s: %w", name, err)
 					}
 
-					err = kr.DeploymentRolloutStatus(ctx, deploymentsTimeout.rolloutTimeout, name)
+					err = kr.DeploymentRolloutStatus(ctx, 10*time.Minute, name)
 					if err != nil {
 						return fmt.Errorf("failed to watch the rollout status of deployment %s: %w", name, err)
 					}
