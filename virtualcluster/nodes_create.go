@@ -56,6 +56,11 @@ func CreateNodepool(ctx context.Context, kubeCfgPath string, nodepoolName string
 		return fmt.Errorf("nodepool %s already exists", cfg.nodeHelmReleaseName())
 	}
 
+	err = installNodeLifecycleDef(ctx, kubeCfgPath)
+	if err != nil {
+		return fmt.Errorf("failed to install node lifecycle def: %w", err)
+	}
+
 	cleanupFn, err := createNodepoolController(ctx, kubeCfgPath, &cfg)
 	if err != nil {
 		return err

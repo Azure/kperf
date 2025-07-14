@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/metrics"
 	"github.com/Azure/kperf/request"
+	"k8s.io/klog/v2"
 
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
@@ -87,6 +88,11 @@ var runCommand = cli.Command{
 		cli.BoolFlag{
 			Name:  "raw-data",
 			Usage: "show raw letencies data in result",
+		},
+		cli.IntFlag{
+			Name:  "duration",
+			Usage: "Duration of the benchmark in seconds. It will be ignored if --total is set.",
+			Value: 0,
 		},
 	},
 	Action: func(cliCtx *cli.Context) error {
@@ -169,8 +175,19 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 	if v := "client"; cliCtx.IsSet(v) || profileCfg.Spec.Client == 0 {
 		profileCfg.Spec.Client = cliCtx.Int(v)
 	}
-	if v := "total"; cliCtx.IsSet(v) || profileCfg.Spec.Total == 0 {
+	if v := "total"; cliCtx.IsSet(v) {
 		profileCfg.Spec.Total = cliCtx.Int(v)
+	}
+	if v := "duration"; cliCtx.IsSet(v) {
+		profileCfg.Spec.Duration = cliCtx.Int(v)
+	}
+	if profileCfg.Spec.Total > 0 && profileCfg.Spec.Duration > 0 {
+		klog.Warningf("both total:%v and duration:%v are set, duration will be ignored\n", profileCfg.Spec.Total, profileCfg.Spec.Duration)
+		profileCfg.Spec.Duration = 0
+	}
+	if profileCfg.Spec.Total == 0 && profileCfg.Spec.Duration == 0 {
+		// Use default total value
+		profileCfg.Spec.Total = cliCtx.Int("total")
 	}
 	if v := "content-type"; cliCtx.IsSet(v) || profileCfg.Spec.ContentType == "" {
 		profileCfg.Spec.ContentType = types.ContentType(cliCtx.String(v))

@@ -119,13 +119,21 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 		"connections", len(restCli),
 		"rate", qps,
 		"total", spec.Total,
+		"duration", spec.Duration,
 		"http2", !spec.DisableHTTP2,
 		"content-type", spec.ContentType,
 	)
 
 	start := time.Now()
 
+	if spec.Duration > 0 {
+		// If duration is set, we will run for duration.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(spec.Duration)*time.Second)
+		defer cancel()
+	}
 	rndReqs.Run(ctx, spec.Total)
+
 	rndReqs.Stop()
 	wg.Wait()
 

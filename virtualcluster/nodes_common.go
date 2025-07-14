@@ -34,6 +34,18 @@ const (
 	// virtualnodeControllerChartName should be aligned with ../manifests/virtualcluster/nodecontrollers.
 	virtualnodeControllerChartName = "virtualcluster/nodecontrollers"
 
+	// virtualnodeLifecycleCRDChartName should be aligned with ../manifests/virtualcluster/lifecycle-crd.
+	virtualnodeLifecycleCRDChartName = "virtualcluster/lifecycle-crd"
+
+	// virtualnodeLifecycleDefChartName should be aligned with ../manifests/virtualcluster/lifecycle-def.
+	virtualnodeLifecycleDefChartName = "virtualcluster/lifecycle-def"
+
+	// virtualnodeLifecycleCRDRelName is the name of node lifecycle CRD.
+	virtualnodeLifecycleCRDRelName = "lifecycle-crd"
+
+	// virtualnodeLifecycleDefRelName is the name of node lifecycle definition.
+	virtualnodeLifecycleDefRelName = "lifecycle-def"
+
 	// virtualnodeReleaseNamespace is used to host virtual nodes.
 	//
 	// NOTE: The Node resource is cluster-scope. Just in case that new node
@@ -45,6 +57,9 @@ const (
 	//
 	// NOTE: Please check the details in ./nodes_create.go.
 	reservedNodepoolSuffixName = "-controller"
+
+	// reservedLifecyclePrefixName is the prefix of lifecycle CRD and definition.
+	reservedLifecyclePrefixName = "lifecycle-"
 )
 
 type nodepoolConfig struct {

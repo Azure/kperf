@@ -50,7 +50,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
-        image: registry.k8s.io/kwok/kwok:v0.5.1
+        image: registry.k8s.io/kwok/kwok:v0.7.0
         imagePullPolicy: IfNotPresent
         name: kwok-controller
         volumeMounts:
@@ -60,7 +60,7 @@ spec:
          limits:
            cpu: "500m"
          requests:
-           cpu: "200m"
+           cpu: "10m"
       restartPolicy: Always
       serviceAccount: {{ .Values.name }}
       serviceAccountName: {{ .Values.name }}

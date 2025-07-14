@@ -78,7 +78,10 @@ func (r *WeightedRandomRequests) Run(ctx context.Context, total int) {
 	r.wg.Add(1)
 
 	sum := 0
-	for sum < total {
+	for {
+		if total > 0 && sum >= total {
+			break
+		}
 		builder := r.randomPick()
 		select {
 		case r.reqBuilderCh <- builder:
@@ -163,6 +166,9 @@ func (b *requestGetBuilder) Build(cli rest.Interface) Requester {
 		comps = append(comps, "api", b.version.Version)
 	} else {
 		comps = append(comps, "apis", b.version.Group, b.version.Version)
+	}
+	if b.namespace != "" {
+		comps = append(comps, "namespaces", b.namespace)
 	}
 	comps = append(comps, b.resource, b.name)
 
