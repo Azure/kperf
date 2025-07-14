@@ -147,6 +147,7 @@ type RequestPut struct {
 	// ValueSize is the object's size in bytes.
 	ValueSize int `json:"valueSize" yaml:"valueSize"`
 }
+
 // RequestPost defines POST request for resource creation
 type RequestPost struct {
 	// KubeGroupVersionResource identifies the resource URI.

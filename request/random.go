@@ -380,9 +380,9 @@ func newRequestPOSTBuilder(src *types.RequestPost, resourceVersion string, maxRe
 			body = trimmed // fallback to raw string
 		}
 	} else {
-        // Use the entire request as body data (current behavior for backward compatibility)
-        body = src
-    }
+		// Use the entire request as body data (current behavior for backward compatibility)
+		body = src
+	}
 	return &requestPOSTBuilder{
 		version: schema.GroupVersion{
 			Group:   src.Group,
