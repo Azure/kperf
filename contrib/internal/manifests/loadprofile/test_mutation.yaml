@@ -1,0 +1,33 @@
+version: 1
+description: "test=mutation"
+spec:
+  rate: 10
+  total: 1
+  conns: 10
+  client: 10
+  contentType: json
+  disableHTTP2: false
+  maxRetries: 0
+  requests:
+    - post:
+        version: v1
+        resource: pods
+        namespace: kperf
+        body: |
+          {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+              "name": "test-mutation"
+            },
+            "spec": {
+              "containers": [
+                {
+                  "name": "pause",
+                  "image": "k8s.gcr.io/pause:3.1"
+                }
+              ]
+            }
+          }
+      shares: 1000
+    

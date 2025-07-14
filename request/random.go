@@ -6,8 +6,10 @@ package request
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 
 	"github.com/Azure/kperf/api/types"
@@ -56,6 +58,8 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 			builder = newRequestGetBuilder(r.QuorumGet, "", spec.MaxRetries)
 		case r.GetPodLog != nil:
 			builder = newRequestGetPodLogBuilder(r.GetPodLog, spec.MaxRetries)
+		case r.Post != nil:
+			builder = newRequestPOSTBuilder(r.Post, "", spec.MaxRetries)
 		default:
 			return nil, fmt.Errorf("not implement for PUT yet")
 		}
@@ -350,6 +354,68 @@ func (b *requestGetPodLogBuilder) Build(cli rest.Interface) Requester {
 					scheme.ParameterCodec,
 					schema.GroupVersion{Version: "v1"},
 				).MaxRetries(b.maxRetries),
+		},
+	}
+}
+
+type requestPOSTBuilder struct {
+	version         schema.GroupVersion
+	resource        string
+	resourceVersion string
+	namespace       string
+	body            interface{}
+	maxRetries      int
+}
+
+func newRequestPOSTBuilder(src *types.RequestPost, resourceVersion string, maxRetries int) *requestPOSTBuilder {
+
+	var body interface{}
+
+	// Check if Body field is specified
+	if src.Body != "" {
+		trimmed := strings.TrimSpace(src.Body)
+		if json.Valid([]byte(trimmed)) {
+			body = []byte(trimmed) // send raw JSON
+		} else {
+			body = trimmed // fallback to raw string
+		}
+	} else {
+        // Use the entire request as body data (current behavior for backward compatibility)
+        body = src
+    }
+	return &requestPOSTBuilder{
+		version: schema.GroupVersion{
+			Group:   src.Group,
+			Version: src.Version,
+		},
+		resource:        src.Resource,
+		resourceVersion: resourceVersion,
+		namespace:       src.Namespace,
+		body:            body,
+		maxRetries:      maxRetries,
+	}
+}
+
+// Build implements RequestBuilder.Build.
+func (b *requestPOSTBuilder) Build(cli rest.Interface) Requester {
+	// https://kubernetes.io/docs/reference/using-api/#api-groups
+	comps := make([]string, 0, 5)
+	if b.version.Group == "" {
+		comps = append(comps, "api", b.version.Version)
+	} else {
+		comps = append(comps, "apis", b.version.Group, b.version.Version)
+	}
+	if b.namespace != "" {
+		comps = append(comps, "namespaces", b.namespace)
+	}
+	comps = append(comps, b.resource)
+
+	return &DiscardRequester{
+		BaseRequester: BaseRequester{
+			method: "POST",
+			req: cli.Post().AbsPath(comps...).
+				Body(b.body).
+				MaxRetries(b.maxRetries),
 		},
 	}
 }
