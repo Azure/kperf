@@ -71,7 +71,8 @@ func benchNode10Job1Pod100CaseRun(cliCtx *cli.Context) (*internaltypes.Benchmark
 	go func() {
 		defer wg.Done()
 
-		utils.RepeatJobWithPod(jobCtx, kubeCfgPath, "job1pod100", "workload/100pod.job.yaml", jobInterval)
+		utils.RepeatJobWithPod(jobCtx, kubeCfgPath, "job1pod100", "workload/100pod.job.yaml",
+			utils.WithJobIntervalOpt(jobInterval))
 	}()
 
 	rgResult, derr := utils.DeployRunnerGroup(ctx,

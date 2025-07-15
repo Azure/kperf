@@ -40,9 +40,20 @@ var (
 )
 
 // RepeatJobWithPod repeats to deploy 3k pods.
-func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string, target string, internal time.Duration) {
+func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string,
+	target string, timeoutOpts ...JobTimeoutOpt) {
 	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
 	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
+
+	var jobsTimeout = &jobsTimeoutOption{
+		jobInterval:   10 * time.Second,
+		applyTimeout:  5 * time.Minute,
+		waitTimeout:   15 * time.Minute,
+		deleteTimeout: 5 * time.Minute,
+	}
+	for _, opt := range timeoutOpts {
+		opt(jobsTimeout)
+	}
 
 	infoLogger.LogKV("msg", "repeat to create job with 3k pods")
 
@@ -85,22 +96,23 @@ func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string,
 
 		time.Sleep(retryInterval)
 
-		aerr := kr.Apply(ctx, 5*time.Minute, jobFile)
+		aerr := kr.Apply(ctx, jobsTimeout.applyTimeout, jobFile)
 		if aerr != nil {
 			warnLogger.LogKV("msg", "failed to apply job, retry after 5 seconds", "job", target, "error", aerr)
 			continue
 		}
 
-		werr := kr.Wait(ctx, 15*time.Minute, "condition=complete", "15m", "job/batchjobs")
+		timoutString := fmt.Sprintf("%ds", int(jobsTimeout.waitTimeout.Seconds()))
+		werr := kr.Wait(ctx, jobsTimeout.waitTimeout, "condition=complete", timoutString, "job/batchjobs")
 		if werr != nil {
 			warnLogger.LogKV("msg", "failed to wait job finish", "job", target, "error", werr)
 		}
 
-		derr := kr.Delete(ctx, 5*time.Minute, jobFile)
+		derr := kr.Delete(ctx, jobsTimeout.deleteTimeout, jobFile)
 		if derr != nil {
 			warnLogger.LogKV("msg", "failed to delete job", "job", target, "error", derr)
 		}
-		time.Sleep(internal)
+		time.Sleep(jobsTimeout.jobInterval)
 	}
 }
 
@@ -110,6 +122,7 @@ func DeployDeployments(
 	kubeCfgPath string,
 	releaseName string,
 	total, replica, paddingBytes int,
+	deployTimeout time.Duration,
 ) (cleanupFn func(), retErr error) {
 	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
 	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
@@ -148,7 +161,7 @@ func DeployDeployments(
 		"paddingBytes", paddingBytes,
 	)
 
-	err = releaseCli.Deploy(ctx, 10*time.Minute)
+	err = releaseCli.Deploy(ctx, deployTimeout)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			infoLogger.LogKV("msg", "deploy is canceled")
@@ -171,7 +184,17 @@ func DeployDeployments(
 	return cleanupFn, nil
 }
 
-func RollingUpdateDeployments(ctx context.Context, total int, namePattern string, kubeCfgPath string, internal time.Duration) {
+func RollingUpdateDeployments(ctx context.Context, total int,
+	namePattern string, kubeCfgPath string, timeoutOpts ...RollingUpdateTimeoutOpt) {
+	var rollingUpdateTimeout = &rollingUpdateTimeoutOption{
+		restartTimeout:  2 * time.Minute,
+		rolloutTimeout:  10 * time.Minute,
+		rolloutInterval: 1 * time.Minute,
+	}
+	for _, opt := range timeoutOpts {
+		opt(rollingUpdateTimeout)
+	}
+
 	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
 	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
 	for {
@@ -179,7 +202,7 @@ func RollingUpdateDeployments(ctx context.Context, total int, namePattern string
 		case <-ctx.Done():
 			infoLogger.LogKV("msg", "stop rolling-updating")
 			return
-		case <-time.After(internal):
+		case <-time.After(rollingUpdateTimeout.rolloutInterval):
 		}
 
 		infoLogger.LogKV("msg", "start to rolling-update deployments")
@@ -191,12 +214,12 @@ func RollingUpdateDeployments(ctx context.Context, total int, namePattern string
 			err := func() error {
 				kr := NewKubectlRunner(kubeCfgPath, ns)
 
-				err := kr.DeploymentRestart(ctx, 2*time.Minute, name)
+				err := kr.DeploymentRestart(ctx, rollingUpdateTimeout.restartTimeout, name)
 				if err != nil {
 					return fmt.Errorf("failed to restart deployment %s: %w", name, err)
 				}
 
-				err = kr.DeploymentRolloutStatus(ctx, 10*time.Minute, name)
+				err = kr.DeploymentRolloutStatus(ctx, rollingUpdateTimeout.rolloutTimeout, name)
 				if err != nil {
 					return fmt.Errorf("failed to watch the rollout status of deployment %s: %w", name, err)
 				}
