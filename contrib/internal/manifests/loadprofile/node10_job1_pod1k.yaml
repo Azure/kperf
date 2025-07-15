@@ -1,0 +1,23 @@
+# SLI Read-Only Node10 Job1 Pod1k load profile
+count: 10
+loadProfile:
+  version: 1
+  description: "10nodes_1000pods"
+  spec:
+    rate: 10
+    conns: 10
+    client: 10
+    contentType: json
+    requests:
+    - staleList:
+        version: v1
+        resource: pods
+        namespace: job1pod1k
+      shares: 10
+    - staleGet:
+        version: v1
+        resource: pods
+        namespace: virtualnodes-kperf-io
+        name: node10job1pod1k-1
+      shares: 300
+    #TODO: Add more resources: jobs, nodes, configmaps ... in  next pr

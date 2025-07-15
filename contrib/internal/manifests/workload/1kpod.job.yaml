@@ -1,0 +1,32 @@
+#SLI Read-Only Node10 Job1 Pod1k workload manifest
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjobs
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      # A taints was added to an automatically created Node.
+      # You can remove taints of Node or add this tolerations.
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
