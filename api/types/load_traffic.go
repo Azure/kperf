@@ -25,6 +25,15 @@ func (ct ContentType) Validate() error {
 	}
 }
 
+// RequestDelete defines DELETE request for target resource type.
+type RequestDelete struct {
+	KubeGroupVersionResource `yaml:",inline"`
+	// Namespace is object's namespace.
+	Namespace string `json:"namespace" yaml:"namespace"`
+	// Name is object's prefix name.
+	Name string `json:"name" yaml:"name"`
+}
+
 // LoadProfile defines how to create load traffic from one host to kube-apiserver.
 type LoadProfile struct {
 	// Version defines the version of this object.
@@ -87,6 +96,8 @@ type WeightedRequest struct {
 	QuorumGet *RequestGet `json:"quorumGet,omitempty" yaml:"quorumGet,omitempty"`
 	// Put means this is mutating request.
 	Put *RequestPut `json:"put,omitempty" yaml:"put,omitempty"`
+	// Delete means this is to delete target object.
+	Delete *RequestDelete `json:"delete,omitempty" yaml:"delete,omitempty"`
 	// GetPodLog means this is to get log from target pod.
 	GetPodLog *RequestGetPodLog `json:"getPodLog,omitempty" yaml:"getPodLog,omitempty"`
 }
@@ -223,9 +234,25 @@ func (r WeightedRequest) Validate() error {
 		return r.Put.Validate()
 	case r.GetPodLog != nil:
 		return r.GetPodLog.Validate()
+	case r.Delete != nil:
+		return r.Delete.Validate()
 	default:
 		return fmt.Errorf("empty request value")
 	}
+}
+
+// Validate validates RequestDelete type.
+func (r *RequestDelete) Validate() error {
+	if err := r.KubeGroupVersionResource.Validate(); err != nil {
+		return fmt.Errorf("kube metadata: %v", err)
+	}
+	if r.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+	if r.Name == "" {
+		return fmt.Errorf("name is required")
+	}
+	return nil
 }
 
 // RequestList validates RequestList type.

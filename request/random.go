@@ -56,6 +56,8 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 			builder = newRequestGetBuilder(r.QuorumGet, "", spec.MaxRetries)
 		case r.GetPodLog != nil:
 			builder = newRequestGetPodLogBuilder(r.GetPodLog, spec.MaxRetries)
+		case r.Delete != nil:
+			builder = newRequestDeleteBuilder(r.Delete, "", spec.MaxRetries)
 		default:
 			return nil, fmt.Errorf("not implement for PUT yet")
 		}
@@ -350,6 +352,53 @@ func (b *requestGetPodLogBuilder) Build(cli rest.Interface) Requester {
 					scheme.ParameterCodec,
 					schema.GroupVersion{Version: "v1"},
 				).MaxRetries(b.maxRetries),
+		},
+	}
+}
+
+type requestDeleteBuilder struct {
+	version         schema.GroupVersion
+	resource        string
+	resourceVersion string
+	namespace       string
+	name            string
+	maxRetries      int
+}
+
+func newRequestDeleteBuilder(src *types.RequestDelete, resourceVersion string, maxRetries int) *requestDeleteBuilder {
+
+	return &requestDeleteBuilder{
+		version: schema.GroupVersion{
+			Group:   src.Group,
+			Version: src.Version,
+		},
+		resource:        src.Resource,
+		resourceVersion: resourceVersion,
+		namespace:       src.Namespace,
+		name:            src.Name,
+		maxRetries:      maxRetries,
+	}
+}
+
+// Build implements RequestBuilder.Build.
+func (b *requestDeleteBuilder) Build(cli rest.Interface) Requester {
+	// https://kubernetes.io/docs/reference/using-api/#api-groups
+	comps := make([]string, 0, 5)
+	if b.version.Group == "" {
+		comps = append(comps, "api", b.version.Version)
+	} else {
+		comps = append(comps, "apis", b.version.Group, b.version.Version)
+	}
+	if b.namespace != "" {
+		comps = append(comps, "namespaces", b.namespace)
+	}
+	comps = append(comps, b.resource, b.name)
+
+	return &DiscardRequester{
+		BaseRequester: BaseRequester{
+			method: "DELETE",
+			req: cli.Delete().AbsPath(comps...).
+				MaxRetries(b.maxRetries),
 		},
 	}
 }
