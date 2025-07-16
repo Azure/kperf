@@ -155,6 +155,7 @@ type RequestPost struct {
 	// Namespace is object's namespace.
 	Namespace string `json:"namespace" yaml:"namespace"`
 	// Body is the request body, for resource creation.
+	// TODO (vittoria): replace with resource template ...e.g workload/deployments/.../deployments.tpl
 	Body string `json:"body,omitempty" yaml:"body,omitempty"`
 }
 
