@@ -28,7 +28,7 @@ var benchNode10Job1Pod1kCase = cli.Command{
 		[]cli.Flag{
 			cli.IntFlag{
 				Name:  "total",
-				Usage: "Total requests per runner (There are 10 runners totally and runner's rate is 1)",
+				Usage: "Total requests per runner (There are 10 runners totally and runner's rate is 10)",
 				Value: 1000,
 			},
 		},
