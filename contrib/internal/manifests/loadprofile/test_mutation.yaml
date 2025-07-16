@@ -1,0 +1,27 @@
+version: 1
+description: "test=mutation"
+spec:
+  rate: 10
+  total: 1
+  conns: 10
+  client: 10
+  contentType: json
+  disableHTTP2: false
+  maxRetries: 0
+  requests:
+    - patch:
+        version: v1
+        resource: pods
+        namespace: kperf
+        name: mutate1
+        patchType: merge
+        body: |
+          {
+            "metadata": {
+              "labels": {
+                "key": "value"
+              }
+            }
+          }
+      shares: 1000
+    
