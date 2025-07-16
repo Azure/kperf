@@ -87,6 +87,8 @@ type WeightedRequest struct {
 	QuorumGet *RequestGet `json:"quorumGet,omitempty" yaml:"quorumGet,omitempty"`
 	// Put means this is mutating request.
 	Put *RequestPut `json:"put,omitempty" yaml:"put,omitempty"`
+	// Patch means this is mutating request to update resource.
+	Patch *RequestPatch `json:"patch,omitempty" yaml:"patch,omitempty"`
 	// GetPodLog means this is to get log from target pod.
 	GetPodLog *RequestGetPodLog `json:"getPodLog,omitempty" yaml:"getPodLog,omitempty"`
 }
@@ -144,6 +146,19 @@ type RequestPut struct {
 	KeySpaceSize int `json:"keySpaceSize" yaml:"keySpaceSize"`
 	// ValueSize is the object's size in bytes.
 	ValueSize int `json:"valueSize" yaml:"valueSize"`
+}
+
+// RequestPatch defines PATCH request for target resource type.
+type RequestPatch struct {
+	KubeGroupVersionResource `yaml:",inline"`
+	// Namespace is object's namespace.
+	Namespace string `json:"namespace" yaml:"namespace"`
+	// Name is object's prefix name.
+	Name string `json:"name" yaml:"name"`
+	// PatchType is the type of patch, e.g. "json", "merge", "strategic-merge".
+	PatchType string `json:"patchType" yaml:"patchType"`
+	// Body is the request body, for fields to be changed.
+	Body string `json:"body" yaml:"body"`
 }
 
 // RequestGetPodLog defines GetLog request for target pod.
@@ -221,6 +236,8 @@ func (r WeightedRequest) Validate() error {
 		return r.QuorumGet.Validate()
 	case r.Put != nil:
 		return r.Put.Validate()
+	case r.Patch != nil:
+		return r.Patch.Validate()
 	case r.GetPodLog != nil:
 		return r.GetPodLog.Validate()
 	default:
@@ -285,10 +302,27 @@ func (r *RequestPut) Validate() error {
 // Validate validates RequestGetPodLog type.
 func (r *RequestGetPodLog) Validate() error {
 	if r.Namespace == "" {
+		return fmt.Errorf("namespace ias required")
+	}
+	if r.Name == "" {
+		return fmt.Errorf("name is required")
+	}
+	return nil
+}
+
+// Validate validates RequestPost type.
+func (r *RequestPatch) Validate() error {
+	if err := r.KubeGroupVersionResource.Validate(); err != nil {
+		return fmt.Errorf("kube metadata: %v", err)
+	}
+	if r.Namespace == "" {
 		return fmt.Errorf("namespace is required")
 	}
 	if r.Name == "" {
 		return fmt.Errorf("name is required")
+	}
+	if r.Body == "" {
+		return fmt.Errorf("body is required")
 	}
 	return nil
 }

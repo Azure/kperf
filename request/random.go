@@ -6,8 +6,10 @@ package request
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 
 	"github.com/Azure/kperf/api/types"
@@ -15,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 )
@@ -56,6 +59,8 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 			builder = newRequestGetBuilder(r.QuorumGet, "", spec.MaxRetries)
 		case r.GetPodLog != nil:
 			builder = newRequestGetPodLogBuilder(r.GetPodLog, spec.MaxRetries)
+		case r.Patch != nil:
+			builder = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
 		default:
 			return nil, fmt.Errorf("not implement for PUT yet")
 		}
@@ -350,6 +355,92 @@ func (b *requestGetPodLogBuilder) Build(cli rest.Interface) Requester {
 					scheme.ParameterCodec,
 					schema.GroupVersion{Version: "v1"},
 				).MaxRetries(b.maxRetries),
+		},
+	}
+}
+
+type requestPatchBuilder struct {
+	version         schema.GroupVersion
+	resource        string
+	resourceVersion string
+	namespace       string
+	name            string
+	patchType       apitypes.PatchType
+	body            interface{}
+	maxRetries      int
+}
+
+func getPatchType(patchType string) apitypes.PatchType {
+	switch patchType {
+	case "json":
+		// JSON Patch: exact field edits (RFC 6902), array of ops
+		//   [{"op": "replace", "path": "/spec/replicas", "value": 3}]
+		return apitypes.JSONPatchType
+	case "merge":
+		// Merge Patch: partial object, simple merge (RFC 7386)
+		// - Input is a partial object (e.g., {"spec": {"replicas": 2}})
+		return apitypes.MergePatchType
+	case "strategic":
+		// Strategic Merge: smart merge for native K8s types
+		// - Input is a partial object (like merge patch)
+		return apitypes.StrategicMergePatchType
+	default:
+		// Default to strategic merge patch if not specified or unknown.
+		return apitypes.StrategicMergePatchType
+	}
+}
+
+func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) *requestPatchBuilder {
+
+	var body interface{}
+
+	// Check if Body field is specified
+	if src.Body != "" {
+		trimmed := strings.TrimSpace(src.Body)
+		if json.Valid([]byte(trimmed)) {
+			body = []byte(trimmed) // send raw JSON
+		} else {
+			body = trimmed // fallback to raw string
+		}
+	} else {
+		// Use the entire request as body data (current behavior for backward compatibility)
+		body = src
+	}
+	return &requestPatchBuilder{
+		version: schema.GroupVersion{
+			Group:   src.Group,
+			Version: src.Version,
+		},
+		resource:        src.Resource,
+		resourceVersion: resourceVersion,
+		namespace:       src.Namespace,
+		name:            src.Name,
+		patchType:       getPatchType(src.PatchType),
+		body:            body,
+		maxRetries:      maxRetries,
+	}
+}
+
+// Build implements RequestBuilder.Build.
+func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
+	// https://kubernetes.io/docs/reference/using-api/#api-groups
+	comps := make([]string, 0, 5)
+	if b.version.Group == "" {
+		comps = append(comps, "api", b.version.Version)
+	} else {
+		comps = append(comps, "apis", b.version.Group, b.version.Version)
+	}
+	if b.namespace != "" {
+		comps = append(comps, "namespaces", b.namespace)
+	}
+	comps = append(comps, b.resource, b.name)
+
+	return &DiscardRequester{
+		BaseRequester: BaseRequester{
+			method: "PATCH",
+			req: cli.Patch(b.patchType).AbsPath(comps...).
+				Body(b.body).
+				MaxRetries(b.maxRetries),
 		},
 	}
 }
