@@ -394,18 +394,13 @@ func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, max
 
 	var body interface{}
 
-	// Check if Body field is specified
-	if src.Body != "" {
-		trimmed := strings.TrimSpace(src.Body)
-		if json.Valid([]byte(trimmed)) {
-			body = []byte(trimmed) // send raw JSON
-		} else {
-			body = trimmed // fallback to raw string
-		}
+	trimmed := strings.TrimSpace(src.Body)
+	if json.Valid([]byte(trimmed)) {
+		body = []byte(trimmed) // send raw JSON
 	} else {
-		// Use the entire request as body data (current behavior for backward compatibility)
-		body = src
+		body = trimmed // fallback to raw string
 	}
+
 	return &requestPatchBuilder{
 		version: schema.GroupVersion{
 			Group:   src.Group,
