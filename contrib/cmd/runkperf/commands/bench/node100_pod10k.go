@@ -106,7 +106,6 @@ func benchNode100DeploymentNPod10KRun(cliCtx *cli.Context) (*internaltypes.Bench
 	ruCleanupFn, err := utils.DeployDeployments(dpCtx,
 		kubeCfgPath, deploymentNamePattern, total, replica, paddingBytes)
 	if err != nil {
-		dpCancel()
 		return nil, fmt.Errorf("failed to setup workload: %w", err)
 	}
 	defer ruCleanupFn()
