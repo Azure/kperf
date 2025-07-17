@@ -21,26 +21,33 @@ loadProfile:
         name: node10job1pod1k-1
       shares: 300
     - staleList:
-        version: v1
-        resource: nodes
-        namespace: virtualnodes-kperf-io
-      shares: 10
-    - staleList: # cluster scoped
-        version: v1
-        resource: nodes
-      shares: 10
-    - staleList: # cluster scoped
-        version: v1
-        resource: namespace
-      shares: 10
-    - staleList:
+        group: batch
         version: v1
         resource: jobs
         namespace: job1pod1k
       shares: 10
     - staleGet:
+        group: batch
         version: v1
         resource: jobs
         namespace: job1pod1k
         name: batchjobs
+      shares: 300
+    - staleList: # cluster scope
+        version: v1
+        resource: nodes
+      shares: 10
+    - staleList: #cluster scope
+        version: v1
+        resource: namespaces
+      shares: 10
+    - staleGet: # cluster scope
+        version: v1
+        resource: nodes
+        name: node10job1pod1k-3
+      shares: 300
+    - staleGet: # cluster scope
+        version: v1
+        resource: namespaces
+        name: job1pod1k
       shares: 300
