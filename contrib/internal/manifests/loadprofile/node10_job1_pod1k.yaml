@@ -20,4 +20,27 @@ loadProfile:
         namespace: virtualnodes-kperf-io
         name: node10job1pod1k-1
       shares: 300
-    #TODO: Add more resources: jobs, nodes, configmaps ... in  next pr
+    - staleList:
+        version: v1
+        resource: nodes
+        namespace: virtualnodes-kperf-io
+      shares: 10
+    - staleList: # cluster scoped
+        version: v1
+        resource: nodes
+      shares: 10
+    - staleList: # cluster scoped
+        version: v1
+        resource: namespace
+      shares: 10
+    - staleList:
+        version: v1
+        resource: jobs
+        namespace: job1pod1k
+      shares: 10
+    - staleGet:
+        version: v1
+        resource: jobs
+        namespace: job1pod1k
+        name: batchjobs
+      shares: 300
