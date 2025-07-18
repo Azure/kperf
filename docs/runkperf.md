@@ -1,11 +1,15 @@
-# runkperf
+# Testing runkperf
 
 runkperf is a command-line tool that runs kperf within a Kubernetes cluster to
 simulate large workloads and measure the performance and stability of the target kube-apiserver.
 
-## Installing runkperf
+## Build
 
-See documentation [Getting-Started#Installing-Kperf](/docs/getting-started.md#installing-kperf).
+For build instructions, see [build.md](./build.md).
+
+## Setup
+
+For setup instructions, see [setup.md](./setup.md)
 
 ## How to run benchmark test?
 
@@ -13,7 +17,7 @@ runkperf includes three benchmark scenarios, one of which focuses on measuring
 performance and stability with 3,000 short-lifecycle pods distributed across 100 nodes.
 
 ```bash
-$ runkperf bench --runner-image ghcr.io/azure/kperf:0.1.8 node10_job1_pod100 --help
+$ runkperf bench --runner-image ghcr.io/azure/kperf:0.3.4 node10_job1_pod100 --help
 
 NAME:
    runkperf bench node10_job1_pod100 -
@@ -53,7 +57,7 @@ When that target cluster is ready, you can run
 ```bash
 $ sudo runkperf -v 3 bench \
   --kubeconfig $HOME/.kube/config \
-  --runner-image ghcr.io/azure/kperf:0.1.8 \
+  --runner-image ghcr.io/azure/kperf:0.3.4 \
   node10_job1_pod100 --total 1000
 ```
 
