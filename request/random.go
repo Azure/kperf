@@ -377,10 +377,8 @@ type requestPatchBuilder struct {
 var patchTypes = map[string]apitypes.PatchType{
 	// json: Array of operations like [{"op": "replace", "path": "/spec/replicas", "value": 3}]
 	"json": apitypes.JSONPatchType,
-
 	// merge: Simple object merge like {"spec": {"replicas": 3}}
 	"merge": apitypes.MergePatchType,
-
 	// strategic-merge: Smart merge for Kubernetes resources that preserves arrays
 	"strategic-merge": apitypes.StrategicMergePatchType,
 }
