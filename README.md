@@ -21,12 +21,13 @@ understanding how a cluster will handle high-load scenarios across diverse workl
 
 ## Getting Started
 
-See documentation on [Getting-Started](/docs/getting-started.md)
+The `kperf` commands provide low-level tools to create and manage virtual node pools, and to benchmark a target kube-apiserver using customizable load profile YAML files.
+
+See documentation on [kperf.md](/docs/kperf.md) for more detail.
 
 ## Running in Cluster
 
-The `kperf` commands offer low-level functions to measure that target kube-apiserver.
-You may need example to combine these functions to run example benchmark test.
+The `runkperf` commands provide high-level orchestration to run end-to-end benchmarks on a target Kubernetes cluster.
 
 See documentation on [runkperf](/docs/runkperf.md) for more detail.
 
