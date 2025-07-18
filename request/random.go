@@ -375,9 +375,14 @@ type requestPatchBuilder struct {
 }
 
 var patchTypes = map[string]apitypes.PatchType{
-	"json":      apitypes.JSONPatchType,
-	"merge":     apitypes.MergePatchType,
-	"strategic": apitypes.StrategicMergePatchType,
+	// json: Array of operations like [{"op": "replace", "path": "/spec/replicas", "value": 3}]
+	"json": apitypes.JSONPatchType,
+
+	// merge: Simple object merge like {"spec": {"replicas": 3}}
+	"merge": apitypes.MergePatchType,
+
+	// strategic-merge: Smart merge for Kubernetes resources that preserves arrays
+	"strategic-merge": apitypes.StrategicMergePatchType,
 }
 
 func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) (*requestPatchBuilder, error) {
@@ -385,11 +390,12 @@ func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, max
 	var body interface{}
 
 	trimmed := strings.TrimSpace(src.Body)
+	// validate that the patch body contains valid json
 	if !json.Valid([]byte(trimmed)) {
 		return nil, fmt.Errorf("invalid JSON in patch body: %q", src.Body)
 	}
 	body = []byte(trimmed)
-
+	// validate patch type
 	patchType, ok := patchTypes[src.PatchType]
 	if !ok {
 		return nil, fmt.Errorf("unknown patch type: %s", src.PatchType)
