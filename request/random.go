@@ -6,8 +6,10 @@ package request
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 
 	"github.com/Azure/kperf/api/types"
@@ -15,6 +17,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 )
@@ -43,6 +46,7 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 		shares = append(shares, r.Shares)
 
 		var builder RESTRequestBuilder
+		var err error
 		switch {
 		case r.StaleList != nil:
 			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries)
@@ -56,6 +60,11 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 			builder = newRequestGetBuilder(r.QuorumGet, "", spec.MaxRetries)
 		case r.GetPodLog != nil:
 			builder = newRequestGetPodLogBuilder(r.GetPodLog, spec.MaxRetries)
+		case r.Patch != nil:
+			builder, err = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create patch request builder: %v", err)
+			}
 		default:
 			return nil, fmt.Errorf("not implement for PUT yet")
 		}
@@ -350,6 +359,81 @@ func (b *requestGetPodLogBuilder) Build(cli rest.Interface) Requester {
 					scheme.ParameterCodec,
 					schema.GroupVersion{Version: "v1"},
 				).MaxRetries(b.maxRetries),
+		},
+	}
+}
+
+type requestPatchBuilder struct {
+	version         schema.GroupVersion
+	resource        string
+	resourceVersion string
+	namespace       string
+	name            string
+	patchType       apitypes.PatchType
+	body            interface{}
+	maxRetries      int
+}
+
+var patchTypes = map[string]apitypes.PatchType{
+	// json: Array of operations [{"op": "replace", "path": "/spec/replicas", "value": 3}]
+	"json": apitypes.JSONPatchType,
+	// merge: Simple object merge {"spec": {"replicas": 3}}
+	"merge": apitypes.MergePatchType,
+	// strategic-merge: Smart merge for Kubernetes resources that preserves arrays
+	"strategic-merge": apitypes.StrategicMergePatchType,
+}
+
+func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) (*requestPatchBuilder, error) {
+
+	var body interface{}
+
+	trimmed := strings.TrimSpace(src.Body)
+	// validate that the patch body contains valid json
+	if !json.Valid([]byte(trimmed)) {
+		return nil, fmt.Errorf("invalid JSON in patch body: %q", src.Body)
+	}
+	body = []byte(trimmed)
+	// validate patch type
+	patchType, ok := patchTypes[src.PatchType]
+	if !ok {
+		return nil, fmt.Errorf("unknown patch type: %s", src.PatchType)
+	}
+
+	return &requestPatchBuilder{
+		version: schema.GroupVersion{
+			Group:   src.Group,
+			Version: src.Version,
+		},
+		resource:        src.Resource,
+		resourceVersion: resourceVersion,
+		namespace:       src.Namespace,
+		name:            src.Name,
+		patchType:       patchType,
+		body:            body,
+		maxRetries:      maxRetries,
+	}, nil
+}
+
+// Build implements RequestBuilder.Build.
+func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
+	// https://kubernetes.io/docs/reference/using-api/#api-groups
+	comps := make([]string, 0, 5)
+	if b.version.Group == "" {
+		comps = append(comps, "api", b.version.Version)
+	} else {
+		comps = append(comps, "apis", b.version.Group, b.version.Version)
+	}
+	if b.namespace != "" {
+		comps = append(comps, "namespaces", b.namespace)
+	}
+	comps = append(comps, b.resource, b.name)
+
+	return &DiscardRequester{
+		BaseRequester: BaseRequester{
+			method: "PATCH",
+			req: cli.Patch(b.patchType).AbsPath(comps...).
+				Body(b.body).
+				MaxRetries(b.maxRetries),
 		},
 	}
 }
