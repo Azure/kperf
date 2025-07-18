@@ -46,6 +46,7 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 		shares = append(shares, r.Shares)
 
 		var builder RESTRequestBuilder
+		var err error
 		switch {
 		case r.StaleList != nil:
 			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries)
@@ -60,7 +61,10 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 		case r.GetPodLog != nil:
 			builder = newRequestGetPodLogBuilder(r.GetPodLog, spec.MaxRetries)
 		case r.Patch != nil:
-			builder = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
+			builder, err = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create patch request builder: %v", err)
+			}
 		default:
 			return nil, fmt.Errorf("not implement for PUT yet")
 		}
@@ -370,35 +374,25 @@ type requestPatchBuilder struct {
 	maxRetries      int
 }
 
-func getPatchType(patchType string) apitypes.PatchType {
-	switch patchType {
-	case "json":
-		// JSON Patch: exact field edits (RFC 6902), array of ops
-		//   [{"op": "replace", "path": "/spec/replicas", "value": 3}]
-		return apitypes.JSONPatchType
-	case "merge":
-		// Merge Patch: partial object, simple merge (RFC 7386)
-		// - Input is a partial object (e.g., {"spec": {"replicas": 2}})
-		return apitypes.MergePatchType
-	case "strategic":
-		// Strategic Merge: smart merge for native K8s types
-		// - Input is a partial object (like merge patch)
-		return apitypes.StrategicMergePatchType
-	default:
-		// Default to strategic merge patch if not specified or unknown.
-		return apitypes.StrategicMergePatchType
-	}
+var patchTypes = map[string]apitypes.PatchType{
+	"json":      apitypes.JSONPatchType,
+	"merge":     apitypes.MergePatchType,
+	"strategic": apitypes.StrategicMergePatchType,
 }
 
-func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) *requestPatchBuilder {
+func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) (*requestPatchBuilder, error) {
 
 	var body interface{}
 
 	trimmed := strings.TrimSpace(src.Body)
-	if json.Valid([]byte(trimmed)) {
-		body = []byte(trimmed) // send raw JSON
-	} else {
-		body = trimmed // fallback to raw string
+	if !json.Valid([]byte(trimmed)) {
+		return nil, fmt.Errorf("invalid JSON in patch body: %q", src.Body)
+	}
+	body = []byte(trimmed)
+
+	patchType, ok := patchTypes[src.PatchType]
+	if !ok {
+		return nil, fmt.Errorf("unknown patch type: %s", src.PatchType)
 	}
 
 	return &requestPatchBuilder{
@@ -410,10 +404,10 @@ func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, max
 		resourceVersion: resourceVersion,
 		namespace:       src.Namespace,
 		name:            src.Name,
-		patchType:       getPatchType(src.PatchType),
+		patchType:       patchType,
 		body:            body,
 		maxRetries:      maxRetries,
-	}
+	}, nil
 }
 
 // Build implements RequestBuilder.Build.
