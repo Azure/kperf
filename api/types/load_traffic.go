@@ -327,8 +327,8 @@ func (m *KubeGroupVersionResource) Validate() error {
 }
 
 var PatchTypeMapping = map[string]string{
-	"json":      "application/json-patch+json",            // RFC 6902 JSON Patch
-	"merge":     "application/merge-patch+json",           // RFC 7396 JSON Merge Patch
+	"json":            "application/json-patch+json",            // RFC 6902 JSON Patch
+	"merge":           "application/merge-patch+json",           // RFC 7396 JSON Merge Patch
 	"strategic-merge": "application/strategic-merge-patch+json", // Kubernetes Strategic Merge
 }
 
@@ -356,7 +356,7 @@ func (r *RequestPatch) Validate() error {
 		return fmt.Errorf("invalid JSON in patch body: %q", r.Body)
 	}
 
-	r.Body = trimmed        // Store the trimmed body
+	r.Body = trimmed // Store the trimmed body
 
 	return nil
 }
