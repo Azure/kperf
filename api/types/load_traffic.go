@@ -3,7 +3,11 @@
 
 package types
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+)
 
 // ContentType represents the format of response.
 type ContentType string
@@ -322,13 +326,16 @@ func (m *KubeGroupVersionResource) Validate() error {
 	return nil
 }
 
+var PatchTypeMapping = map[string]string{
+	"json":      "application/json-patch+json",            // RFC 6902 JSON Patch
+	"merge":     "application/merge-patch+json",           // RFC 7396 JSON Merge Patch
+	"strategic-merge": "application/strategic-merge-patch+json", // Kubernetes Strategic Merge
+}
+
 // Validate validates RequestPatch type.
 func (r *RequestPatch) Validate() error {
 	if err := r.KubeGroupVersionResource.Validate(); err != nil {
 		return fmt.Errorf("kube metadata: %v", err)
-	}
-	if r.Namespace == "" {
-		return fmt.Errorf("namespace is required")
 	}
 	if r.Name == "" {
 		return fmt.Errorf("name is required")
@@ -336,5 +343,20 @@ func (r *RequestPatch) Validate() error {
 	if r.Body == "" {
 		return fmt.Errorf("body is required")
 	}
+
+	// Validate patch type
+	_, ok := PatchTypeMapping[r.PatchType]
+	if !ok {
+		return fmt.Errorf("unknown patch type: %s (valid types: json, merge, strategic-merge)", r.PatchType)
+	}
+
+	// Validate JSON body and trim it
+	trimmed := strings.TrimSpace(r.Body)
+	if !json.Valid([]byte(trimmed)) {
+		return fmt.Errorf("invalid JSON in patch body: %q", r.Body)
+	}
+
+	r.Body = trimmed        // Store the trimmed body
+
 	return nil
 }

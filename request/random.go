@@ -6,10 +6,8 @@ package request
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"math/big"
-	"strings"
 	"sync"
 
 	"github.com/Azure/kperf/api/types"
@@ -46,7 +44,6 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 		shares = append(shares, r.Shares)
 
 		var builder RESTRequestBuilder
-		var err error
 		switch {
 		case r.StaleList != nil:
 			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries)
@@ -61,10 +58,7 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 		case r.GetPodLog != nil:
 			builder = newRequestGetPodLogBuilder(r.GetPodLog, spec.MaxRetries)
 		case r.Patch != nil:
-			builder, err = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create patch request builder: %v", err)
-			}
+			builder = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
 		default:
 			return nil, fmt.Errorf("not implement for PUT yet")
 		}
@@ -374,30 +368,7 @@ type requestPatchBuilder struct {
 	maxRetries      int
 }
 
-var patchTypes = map[string]apitypes.PatchType{
-	// json: Array of operations [{"op": "replace", "path": "/spec/replicas", "value": 3}]
-	"json": apitypes.JSONPatchType,
-	// merge: Simple object merge {"spec": {"replicas": 3}}
-	"merge": apitypes.MergePatchType,
-	// strategic-merge: Smart merge for Kubernetes resources that preserves arrays
-	"strategic-merge": apitypes.StrategicMergePatchType,
-}
-
-func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) (*requestPatchBuilder, error) {
-
-	var body interface{}
-
-	trimmed := strings.TrimSpace(src.Body)
-	// validate that the patch body contains valid json
-	if !json.Valid([]byte(trimmed)) {
-		return nil, fmt.Errorf("invalid JSON in patch body: %q", src.Body)
-	}
-	body = []byte(trimmed)
-	// validate patch type
-	patchType, ok := patchTypes[src.PatchType]
-	if !ok {
-		return nil, fmt.Errorf("unknown patch type: %s", src.PatchType)
-	}
+func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) *requestPatchBuilder {
 
 	return &requestPatchBuilder{
 		version: schema.GroupVersion{
@@ -408,10 +379,10 @@ func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, max
 		resourceVersion: resourceVersion,
 		namespace:       src.Namespace,
 		name:            src.Name,
-		patchType:       patchType,
-		body:            body,
+		patchType:       apitypes.PatchType(types.PatchTypeMapping[src.PatchType]),
+		body:            []byte(src.Body),
 		maxRetries:      maxRetries,
-	}, nil
+	}
 }
 
 // Build implements RequestBuilder.Build.
