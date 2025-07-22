@@ -1,0 +1,320 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-1
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-1
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-2
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-2
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-3
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-3
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-4
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-4
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-5
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-5
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-6
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-6
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-7
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-7
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-8
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-8
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-9
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-9
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batchjob-10
+  namespace: job10pod10k
+spec:
+  completions: 1000
+  parallelism: 100
+  template:
+    metadata:
+      labels:
+        app: fake-pod
+        job: batchjob-10
+    spec:
+      restartPolicy: Never
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: type
+                operator: In
+                values:
+                - kperf-virtualnodes
+      tolerations:
+      - key: "kperf.io/nodepool"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: fake-container
+        image: fake-image
