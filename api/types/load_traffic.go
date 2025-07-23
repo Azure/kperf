@@ -368,6 +368,6 @@ func (r *RequestPatch) Validate() error {
 	}
 
 	r.Body = trimmed // Store the trimmed body
-	
+
 	return nil
 }
