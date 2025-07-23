@@ -537,3 +537,117 @@ func DeleteConfigmaps(ctx context.Context, kubeCfgPath string, namespace string,
 	return err
 
 }
+
+// Deploy jobs using template
+func DeployJobs(
+	ctx context.Context,
+	kubeCfgPath string,
+	releaseName string,
+	jobCount, podsPerJob, parallelism int,
+	namespace string,
+	deployTimeout time.Duration,
+) (cleanupFn func(), retErr error) {
+	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
+	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
+
+	target := "workload/jobs"
+	ch, err := manifests.LoadChart(target)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load %s chart: %w", target, err)
+	}
+
+	namePattern := releaseName
+
+	releaseCli, err := helmcli.NewReleaseCli(
+		kubeCfgPath,
+		namespace,
+		releaseName,
+		ch,
+		nil,
+		helmcli.StringPathValuesApplier(
+			fmt.Sprintf("namePattern=%s", namePattern),
+			fmt.Sprintf("jobCount=%d", jobCount),
+			fmt.Sprintf("podsPerJob=%d", podsPerJob),
+			fmt.Sprintf("parallelism=%d", parallelism),
+			fmt.Sprintf("namespace=%s", namespace),
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a new helm release cli: %w", err)
+	}
+
+	infoLogger.LogKV(
+		"msg", "deploying jobs",
+		"jobCount", jobCount,
+		"podsPerJob", podsPerJob,
+		"parallelism", parallelism,
+		"namespace", namespace,
+	)
+
+	// Create namespace if it doesn't exist
+	kr := NewKubectlRunner(kubeCfgPath, namespace)
+	err = kr.CreateNamespace(ctx, 2*time.Minute, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create namespace %s: %w", namespace, err)
+	}
+
+	err = releaseCli.Deploy(ctx, deployTimeout)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			infoLogger.LogKV("msg", "deploy is canceled")
+			return func() {}, nil
+		}
+		return nil, fmt.Errorf("failed to deploy helm chart %s: %w", target, err)
+	}
+	infoLogger.LogKV("msg", "deployed jobs")
+
+	cleanupFn = func() {
+		// Cleanup helm chart first
+		err := releaseCli.Uninstall()
+		if err != nil {
+			warnLogger.LogKV("msg", "failed to cleanup helm chart", "error", err)
+		}
+
+		// Then cleanup namespace
+		err = kr.DeleteNamespace(context.TODO(), 5*time.Minute, namespace)
+		if err != nil {
+			warnLogger.LogKV("msg", "failed to cleanup namespace", "error", err)
+		}
+	}
+
+	return cleanupFn, nil
+}
+
+// WaitForJobsCompletion waits for jobs to completekube
+func WaitForJobsCompletion(
+	ctx context.Context,
+	kubeCfgPath string,
+	namespace string,
+	namePattern string,
+	jobCount int,
+	waitTimeout time.Duration,
+) error {
+	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
+	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
+
+	kr := NewKubectlRunner(kubeCfgPath, namespace)
+	timeoutString := fmt.Sprintf("%ds", int(waitTimeout.Seconds()))
+
+	infoLogger.LogKV("msg", "waiting for jobs to complete", "pattern", namePattern, "count", jobCount)
+
+	for i := 1; i <= jobCount; i++ {
+		jobName := fmt.Sprintf("%s-%d", namePattern, i)
+		target := fmt.Sprintf("job/%s", jobName)
+
+		infoLogger.LogKV("msg", "waiting for job", "name", jobName)
+
+		err := kr.Wait(ctx, waitTimeout, "condition=complete", timeoutString, target)
+		if err != nil {
+			warnLogger.LogKV("msg", "failed to wait for job completion", "job", jobName, "error", err)
+			return fmt.Errorf("job %s did not complete within timeout: %w", jobName, err)
+		}
+	}
+
+	infoLogger.LogKV("msg", "all jobs completed successfully", "pattern", namePattern, "count", jobCount)
+	return nil
+}

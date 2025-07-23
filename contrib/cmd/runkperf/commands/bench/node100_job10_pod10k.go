@@ -3,13 +3,12 @@
 
 // SLI Read Only Benchmark
 // This benchmark is to test the read-only performance of a Kubernetes cluster
-// deploying a job with 1000 pods on 10 virtual nodes.
+// deploying jobs with 10k pods on 100 virtual nodes.
 package bench
 
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	internaltypes "github.com/Azure/kperf/contrib/internal/types"
@@ -21,8 +20,8 @@ import (
 var benchNode100Job10Pod10kCase = cli.Command{
 	Name: "node100_job10_pod10k",
 	Usage: `
-	The test suite is to setup 100 virtual nodes and deploy 10 jobs with 10k pods on
-	those nodes. It repeats to create and delete job. The load profile is fixed.
+	The test suite is to setup SLI read-only performance on 100 virtual nodes and deploy 10 jobs with 10k pods on
+	those nodes. It creates jobs once and measures read-only performance. The load profile is fixed.
 	`,
 	Flags: append(
 		[]cli.Flag{
@@ -30,6 +29,21 @@ var benchNode100Job10Pod10kCase = cli.Command{
 				Name:  "total",
 				Usage: "Total requests per runner (There are 10 runners totally and runner's rate is 10)",
 				Value: 1000,
+			},
+			cli.IntFlag{
+				Name:  "job-count",
+				Usage: "Number of jobs to deploy",
+				Value: 10,
+			},
+			cli.IntFlag{
+				Name:  "pods-per-job",
+				Usage: "Number of pods per job",
+				Value: 1000,
+			},
+			cli.IntFlag{
+				Name:  "parallelism",
+				Usage: "Parallelism for each job",
+				Value: 100,
 			},
 		},
 		commonFlags...,
@@ -53,6 +67,7 @@ func benchNode100Job10Pod10kCaseRun(cliCtx *cli.Context) (*internaltypes.Benchma
 	}
 	defer func() { _ = rgCfgFileDone() }()
 
+	// Deploy virtual nodes
 	vcDone, err := deployVirtualNodepool(ctx, cliCtx, "node100job10pod10k",
 		100,
 		cliCtx.Int("cpu"),
@@ -64,37 +79,56 @@ func benchNode100Job10Pod10kCaseRun(cliCtx *cli.Context) (*internaltypes.Benchma
 	}
 	defer func() { _ = vcDone() }()
 
-	var wg sync.WaitGroup
-	wg.Add(1)
+	// Deploy jobs
+	jobCount := cliCtx.Int("job-count")
+	podsPerJob := cliCtx.Int("pods-per-job")
+	parallelism := cliCtx.Int("parallelism")
 
-	jobInterval := 5 * time.Second
-	jobCtx, jobCancel := context.WithCancel(ctx)
-	go func() {
-		defer wg.Done()
+	jobsCleanup, err := utils.DeployJobs(
+		ctx,
+		kubeCfgPath,
+		"benchmark-jobs",
+		jobCount,
+		podsPerJob,
+		parallelism,
+		"job10pod10k",
+		10*time.Minute, // deployTimeout
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deploy jobs: %w", err)
+	}
+	defer jobsCleanup()
 
-		utils.RepeatJobWithPod(jobCtx, kubeCfgPath, "job10pod10k", "workload/10kpod.job10.yaml",
-			utils.WithJobIntervalOpt(jobInterval))
+	err = utils.WaitForJobsCompletion(
+		ctx,
+		kubeCfgPath,
+		"job10pod10k",
+		"benchmark-jobs",
+		jobCount,
+		30*time.Minute,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("jobs did not complete: %w", err)
+	}
 
-	}()
-
-	rgResult, derr := utils.DeployRunnerGroup(ctx,
+	// Deploy runner group to measure read-only performance
+	rgResult, err := utils.DeployRunnerGroup(ctx,
 		cliCtx.GlobalString("kubeconfig"),
 		cliCtx.GlobalString("runner-image"),
 		rgCfgFile,
 		cliCtx.GlobalString("runner-flowcontrol"),
 		cliCtx.GlobalString("rg-affinity"),
 	)
-	jobCancel()
-	wg.Wait()
-
-	if derr != nil {
-		return nil, derr
+	if err != nil {
+		return nil, err
 	}
 
 	return &internaltypes.BenchmarkReport{
 		Description: fmt.Sprintf(`
 		Environment: 100 virtual nodes managed by kwok-controller,
-		Workload: Deploy 10 job with 10,000 pods repeatedly. The parallelism is 100. The interval is %v`, jobInterval),
+		Workload: Deploy %d jobs with %d pods each (total %d pods) with parallelism %d.
+		Measures read-only performance against stable workload.`,
+			jobCount, podsPerJob, jobCount*podsPerJob, parallelism),
 		LoadSpec: *rgSpec,
 		Result:   *rgResult,
 		Info:     make(map[string]interface{}),
