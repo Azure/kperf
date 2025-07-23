@@ -369,6 +369,7 @@ type requestPatchBuilder struct {
 }
 
 func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) *requestPatchBuilder {
+	patchType, _ := types.GetPatchType(src.PatchType)
 
 	return &requestPatchBuilder{
 		version: schema.GroupVersion{
@@ -379,7 +380,7 @@ func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, max
 		resourceVersion: resourceVersion,
 		namespace:       src.Namespace,
 		name:            src.Name,
-		patchType:       apitypes.PatchType(types.PatchTypeMapping[src.PatchType]),
+		patchType:       patchType,
 		body:            []byte(src.Body),
 		maxRetries:      maxRetries,
 	}
