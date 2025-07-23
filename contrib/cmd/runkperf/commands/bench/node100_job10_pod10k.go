@@ -3,7 +3,7 @@
 
 // SLI Read Only Benchmark
 // This benchmark is to test the read-only performance of a Kubernetes cluster
-// deploying jobs with 10k pods on 100 virtual nodes.
+// deploying 10 jobs with 10k pods on 100 virtual nodes.
 package bench
 
 import (
