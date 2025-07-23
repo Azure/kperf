@@ -330,16 +330,16 @@ func (m *KubeGroupVersionResource) Validate() error {
 
 // GetPatchType returns the Kubernetes PatchType for a given patch type string.
 // Returns the PatchType and an error if the patch type is invalid.
-func GetPatchType(patchType string) (apitypes.PatchType, error) {
+func GetPatchType(patchType string) (apitypes.PatchType, bool) {
 	switch patchType {
 	case "json":
-		return apitypes.JSONPatchType, nil
+		return apitypes.JSONPatchType, true
 	case "merge":
-		return apitypes.MergePatchType, nil
+		return apitypes.MergePatchType, true
 	case "strategic-merge":
-		return apitypes.StrategicMergePatchType, nil
+		return apitypes.StrategicMergePatchType, true
 	default:
-		return "", fmt.Errorf("unknown patch type: %s (valid types: json, merge, strategic-merge)", patchType)
+		return "", false
 	}
 }
 
@@ -348,27 +348,26 @@ func (r *RequestPatch) Validate() error {
 	if err := r.KubeGroupVersionResource.Validate(); err != nil {
 		return fmt.Errorf("kube metadata: %v", err)
 	}
-
 	if r.Name == "" {
 		return fmt.Errorf("name is required")
 	}
-
 	if r.Body == "" {
 		return fmt.Errorf("body is required")
 	}
 
 	// Validate patch type
-	_, err := GetPatchType(r.PatchType)
-	if err != nil {
-		return err
+	_, ok := GetPatchType(r.PatchType)
+	if !ok {
+		return fmt.Errorf("unknown patch type: %s (valid types: json, merge, strategic-merge)", r.PatchType)
 	}
 
-	// Validate and trim JSON body
+	// Validate JSON body and trim it
 	trimmed := strings.TrimSpace(r.Body)
 	if !json.Valid([]byte(trimmed)) {
 		return fmt.Errorf("invalid JSON in patch body: %q", r.Body)
 	}
 
 	r.Body = trimmed // Store the trimmed body
+	
 	return nil
 }
