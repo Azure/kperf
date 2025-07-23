@@ -635,7 +635,7 @@ func WaitForJobsCompletion(
 
 	infoLogger.LogKV("msg", "waiting for jobs to complete", "pattern", namePattern, "count", jobCount)
 
-	for i := 1; i <= jobCount; i++ {
+	for i := 0; i < jobCount; i++ {
 		jobName := fmt.Sprintf("%s-%d", namePattern, i)
 		target := fmt.Sprintf("job/%s", jobName)
 

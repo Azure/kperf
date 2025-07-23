@@ -31,7 +31,7 @@ loadProfile:
         version: v1
         resource: jobs
         namespace: job10pod10k
-        name: batchjobs
+        name: benchmark-jobs-5
       shares: 300
     - staleList: # cluster scope
         version: v1

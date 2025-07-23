@@ -3,7 +3,7 @@
 {{- $podsPerJob := int .Values.podsPerJob }}
 {{- $parallelism := int .Values.parallelism }}
 {{- $namespace := .Values.namespace }}
-{{- range $index := (untilStep 1 (int .Values.jobCount) 1) }}
+{{- range $index := (untilStep 0 (int .Values.jobCount) 1) }}
 ---
 apiVersion: batch/v1
 kind: Job
