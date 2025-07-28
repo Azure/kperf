@@ -31,19 +31,14 @@ var benchNode100Job10Pod10kCase = cli.Command{
 				Value: 1000,
 			},
 			cli.IntFlag{
-				Name:  "job-count",
-				Usage: "Number of jobs to deploy",
-				Value: 10,
-			},
-			cli.IntFlag{
-				Name:  "pods-per-job",
-				Usage: "Number of pods per job",
-				Value: 1000,
-			},
-			cli.IntFlag{
 				Name:  "parallelism",
 				Usage: "Parallelism for each job",
 				Value: 100,
+			},
+			cli.IntFlag{
+				Name: "ttlSecondsAfterFinished",
+				Usage: "TTL seconds after finished for each job",
+				Value: 0,
 			},
 		},
 		commonFlags...,
@@ -60,6 +55,14 @@ func benchNode100Job10Pod10kCaseRun(cliCtx *cli.Context) (*internaltypes.Benchma
 	ctx := context.Background()
 	kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 
+	// Fixed benchmark configuration
+	const (
+		nodeCount  = 100
+		jobCount   = 10
+		podsPerJob = 1000
+		totalPods  = jobCount * podsPerJob // 10,000 pods
+	)
+
 	rgCfgFile, rgSpec, rgCfgFileDone, err := newLoadProfileFromEmbed(cliCtx,
 		"loadprofile/node100_job10_pod10k.yaml")
 	if err != nil {
@@ -69,7 +72,7 @@ func benchNode100Job10Pod10kCaseRun(cliCtx *cli.Context) (*internaltypes.Benchma
 
 	// Deploy virtual nodes
 	vcDone, err := deployVirtualNodepool(ctx, cliCtx, "node100job10pod10k",
-		100,
+		nodeCount,
 		cliCtx.Int("cpu"),
 		cliCtx.Int("memory"),
 		cliCtx.Int("max-pods"),
@@ -79,17 +82,15 @@ func benchNode100Job10Pod10kCaseRun(cliCtx *cli.Context) (*internaltypes.Benchma
 	}
 	defer func() { _ = vcDone() }()
 
-	// Deploy jobs
-	jobCount := cliCtx.Int("job-count")
-	podsPerJob := cliCtx.Int("pods-per-job")
+	// Deploy jobs with fixed values
 	parallelism := cliCtx.Int("parallelism")
 
 	jobsCleanup, err := utils.DeployJobs(
 		ctx,
 		kubeCfgPath,
 		"benchmark-jobs",
-		jobCount,
-		podsPerJob,
+		jobCount,   // Fixed: 10
+		podsPerJob, // Fixed: 1000
 		parallelism,
 		"job10pod10k",
 		10*time.Minute, // deployTimeout
@@ -98,18 +99,6 @@ func benchNode100Job10Pod10kCaseRun(cliCtx *cli.Context) (*internaltypes.Benchma
 		return nil, fmt.Errorf("failed to deploy jobs: %w", err)
 	}
 	defer jobsCleanup()
-
-	err = utils.WaitForJobsCompletion(
-		ctx,
-		kubeCfgPath,
-		"job10pod10k",
-		"benchmark-jobs",
-		jobCount,
-		30*time.Minute,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("jobs did not complete: %w", err)
-	}
 
 	// Deploy runner group to measure read-only performance
 	rgResult, err := utils.DeployRunnerGroup(ctx,
@@ -125,10 +114,10 @@ func benchNode100Job10Pod10kCaseRun(cliCtx *cli.Context) (*internaltypes.Benchma
 
 	return &internaltypes.BenchmarkReport{
 		Description: fmt.Sprintf(`
-		Environment: 100 virtual nodes managed by kwok-controller,
+		Environment: %d virtual nodes managed by kwok-controller,
 		Workload: Deploy %d jobs with %d pods each (total %d pods) with parallelism %d.
 		Measures read-only performance against stable workload.`,
-			jobCount, podsPerJob, jobCount*podsPerJob, parallelism),
+			nodeCount, jobCount, podsPerJob, totalPods, parallelism),
 		LoadSpec: *rgSpec,
 		Result:   *rgResult,
 		Info:     make(map[string]interface{}),

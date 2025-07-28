@@ -618,36 +618,3 @@ func DeployJobs(
 	return cleanupFn, nil
 }
 
-// WaitForJobsCompletion waits for jobs to completekube
-func WaitForJobsCompletion(
-	ctx context.Context,
-	kubeCfgPath string,
-	namespace string,
-	namePattern string,
-	jobCount int,
-	waitTimeout time.Duration,
-) error {
-	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
-	warnLogger := log.GetLogger(ctx).WithKeyValues("level", "warn")
-
-	kr := NewKubectlRunner(kubeCfgPath, namespace)
-	timeoutString := fmt.Sprintf("%ds", int(waitTimeout.Seconds()))
-
-	infoLogger.LogKV("msg", "waiting for jobs to complete", "pattern", namePattern, "count", jobCount)
-
-	for i := 0; i < jobCount; i++ {
-		jobName := fmt.Sprintf("%s-%d", namePattern, i)
-		target := fmt.Sprintf("job/%s", jobName)
-
-		infoLogger.LogKV("msg", "waiting for job", "name", jobName)
-
-		err := kr.Wait(ctx, waitTimeout, "condition=complete", timeoutString, target)
-		if err != nil {
-			warnLogger.LogKV("msg", "failed to wait for job completion", "job", jobName, "error", err)
-			return fmt.Errorf("job %s did not complete within timeout: %w", jobName, err)
-		}
-	}
-
-	infoLogger.LogKV("msg", "all jobs completed successfully", "pattern", namePattern, "count", jobCount)
-	return nil
-}

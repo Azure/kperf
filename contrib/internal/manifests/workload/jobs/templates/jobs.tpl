@@ -3,6 +3,7 @@
 {{- $podsPerJob := int .Values.podsPerJob }}
 {{- $parallelism := int .Values.parallelism }}
 {{- $namespace := .Values.namespace }}
+{{- $ttlSecondsAfterFinished := int .Values.ttlSecondsAfterFinished }}
 {{- range $index := (untilStep 0 (int .Values.jobCount) 1) }}
 ---
 apiVersion: batch/v1
@@ -15,6 +16,7 @@ metadata:
     job-group: {{ $pattern }}
     job-index: "{{ $index }}"
 spec:
+  ttlSecondsAfterFinished: {{ $ttlSecondsAfterFinished }}
   completions: {{ $podsPerJob }}
   parallelism: {{ $parallelism }}
   backoffLimit: 3

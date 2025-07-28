@@ -4,3 +4,4 @@ podsPerJob: 1000
 parallelism: 100
 namespace: "benchmark-jobs"
 namePattern: "batchjob"
+ttlSecondsAfterFinished: 0
