@@ -67,7 +67,7 @@ func WithJobDeleteTimeoutOpt(to time.Duration) JobTimeoutOpt {
 	}
 }
 
-var deploymentBatchSize int = 20
+var deploymentBatchSize = 20
 
 type DeploymentBatchManager struct {
 	KubeCfgPath           string
