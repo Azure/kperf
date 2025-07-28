@@ -121,7 +121,7 @@ func DeployDeployments(
 	ctx context.Context,
 	kubeCfgPath string,
 	releaseName string,
-	total, replica, paddingBytes int,
+	total, replica, paddingBytes int, start int,
 	deployTimeout time.Duration,
 ) (cleanupFn func(), retErr error) {
 	infoLogger := log.GetLogger(ctx).WithKeyValues("level", "info")
@@ -148,6 +148,7 @@ func DeployDeployments(
 			fmt.Sprintf("total=%d", total),
 			fmt.Sprintf("replica=%d", replica),
 			fmt.Sprintf("paddingBytes=%d", paddingBytes),
+			fmt.Sprintf("start=%d", start),
 		),
 	)
 	if err != nil {
