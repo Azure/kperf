@@ -88,7 +88,7 @@ func (bm *DeploymentBatchManager) Add(ctx context.Context, total int) error {
 			currentBatchSize = total - start
 		}
 
-		cleanup, err := DeployDeployments(ctx, bm.KubeCfgPath, namePattern, start+currentBatchSize, bm.DeploymentReplica,
+		cleanup, err := DeployDeployments(ctx, bm.KubeCfgPath, namePattern, currentBatchSize, bm.DeploymentReplica,
 			bm.PaddingBytes, start, 10*time.Minute)
 		if err != nil {
 			return err

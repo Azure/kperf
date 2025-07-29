@@ -1,7 +1,7 @@
 {{- $pattern := .Values.namePattern }}
 {{- $replica := int .Values.replica }}
 {{- $paddingBytes := int .Values.paddingBytes }}
-{{- range $index := (untilStep (int .Values.start) (int .Values.total) 1) }}
+{{- range $index := (untilStep (int .Values.start) (int (add (int .Values.start) (int .Values.total))) 1) }}
 apiVersion: v1
 kind: Namespace
 metadata:
