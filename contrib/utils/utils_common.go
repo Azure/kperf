@@ -67,23 +67,22 @@ func WithJobDeleteTimeoutOpt(to time.Duration) JobTimeoutOpt {
 	}
 }
 
-var deploymentBatchSize = 20
-
 type DeploymentBatchManager struct {
 	KubeCfgPath           string
 	DeploymentNamePattern string
 	DeploymentReplica     int
 	PaddingBytes          int
+	DeploymentBatchSize   int
 	cleanups              []func()
 }
 
 func (bm *DeploymentBatchManager) Add(ctx context.Context, total int) error {
-	for start := 0; start < total; start += deploymentBatchSize {
+	for start := 0; start < total; start += bm.DeploymentBatchSize {
 		// Create a unique name for each deployment batch
-		namePattern := fmt.Sprintf("%s-%d", bm.DeploymentNamePattern, start/deploymentBatchSize)
+		namePattern := fmt.Sprintf("%s-%d", bm.DeploymentNamePattern, start/bm.DeploymentBatchSize)
 
 		// Calculate the current batch size, ensuring it does not exceed the total
-		currentBatchSize := deploymentBatchSize
+		currentBatchSize := bm.DeploymentBatchSize
 		if start+currentBatchSize > total {
 			currentBatchSize = total - start
 		}

@@ -107,6 +107,7 @@ func benchNode100DeploymentNPod10KRun(cliCtx *cli.Context) (*internaltypes.Bench
 		DeploymentNamePattern: deploymentNamePattern,
 		DeploymentReplica:     replica,
 		PaddingBytes:          paddingBytes,
+		DeploymentBatchSize:   20,
 	}
 
 	err = bm.Add(dpCtx, total)
