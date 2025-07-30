@@ -36,7 +36,7 @@ var benchNode100Job10Pod10kCase = cli.Command{
 				Value: 100,
 			},
 			cli.IntFlag{
-				Name: "ttlSecondsAfterFinished",
+				Name:  "ttlSecondsAfterFinished",
 				Usage: "TTL seconds after finished for each job",
 				Value: 0,
 			},
