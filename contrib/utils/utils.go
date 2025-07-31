@@ -4,6 +4,7 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/Azure/kperf/api/types"
@@ -20,10 +22,10 @@ import (
 	"github.com/Azure/kperf/contrib/log"
 	"github.com/Azure/kperf/helmcli"
 
-	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -114,6 +116,39 @@ func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string,
 		}
 		time.Sleep(jobsTimeout.jobInterval)
 	}
+}
+
+// RenderTemplate renders a resource template to JSON for K8s API requests
+func RenderTemplate(resource string, values map[string]interface{}) ([]byte, error) {
+	// Resource template
+	// TODO: add more template for resource
+	templatePaths := map[string]string{
+		"pods": "workload/pods/templates/pod.tpl",
+	}
+	templatePath, ok := templatePaths[resource]
+	if !ok {
+		return nil, fmt.Errorf("unsupported resource type: %s", resource)
+	}
+
+	templateContent, err := manifests.FS.ReadFile(templatePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read template: %w", err)
+	}
+
+	tmpl, err := template.New(resource).Parse(string(templateContent))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, map[string]interface{}{
+		"Values": values,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return yaml.YAMLToJSON(buf.Bytes())
 }
 
 // DeployDeployments deploys deployments.

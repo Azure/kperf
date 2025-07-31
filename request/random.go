@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/Azure/kperf/api/types"
+	"github.com/Azure/kperf/contrib/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,6 +62,8 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 			builder = newRequestGetPodLogBuilder(r.GetPodLog, spec.MaxRetries)
 		case r.Patch != nil:
 			builder = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
+		case r.PostDel != nil:
+			builder = newRequestPostDelBuilder(r.PostDel, "", spec.MaxRetries)
 		default:
 			return nil, fmt.Errorf("not implement for PUT yet")
 		}
@@ -408,6 +413,144 @@ func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
 				MaxRetries(b.maxRetries),
 		},
 	}
+}
+
+type requestPostDelBuilder struct {
+	version         schema.GroupVersion
+	resource        string
+	resourceVersion string
+	namespace       string
+	deleteRatio     float64
+	maxRetries      int
+}
+
+func newRequestPostDelBuilder(src *types.RequestPostDel, resourceVersion string, maxRetries int) *requestPostDelBuilder {
+	return &requestPostDelBuilder{
+		version:         schema.GroupVersion{Group: src.Group, Version: src.Version},
+		resource:        src.Resource,
+		resourceVersion: resourceVersion,
+		namespace:       src.Namespace,
+		deleteRatio:     src.DeleteRatio,
+		maxRetries:      maxRetries,
+	}
+}
+
+var (
+	postCache = struct {
+		sync.Mutex
+		items []string
+	}{}
+
+	// Global atomic counter for resource unique ID generation
+	resourceCounter int64
+)
+
+// Build implements RequestBuilder.Build.
+func (b *requestPostDelBuilder) Build(cli rest.Interface) Requester {
+
+	comps := make([]string, 0, 5)
+	if b.version.Group == "" {
+		comps = append(comps, "api", b.version.Version)
+	} else {
+		comps = append(comps, "apis", b.version.Group, b.version.Version)
+	}
+	if b.namespace != "" {
+		comps = append(comps, "namespaces", b.namespace)
+	}
+
+	// Random pick operation DELETE or CREATE based on deleteRatio probability
+	randomInt, _ := rand.Int(rand.Reader, big.NewInt(1000))
+	shouldDelete := float64(randomInt.Int64())/1000.0 < b.deleteRatio
+
+	if shouldDelete {
+		// DELETE operation -
+		cacheRetries := 100
+		for i := 0; i < cacheRetries; i++ {
+			postCache.Lock()
+			if len(postCache.items) > 0 {
+				name := postCache.items[0]
+				postCache.items = postCache.items[1:]
+				postCache.Unlock()
+
+				comps = append(comps, b.resource, name)
+
+				return &DeleteRequester{
+					BaseRequester: BaseRequester{
+						method: "DELETE",
+						req: cli.Delete().AbsPath(comps...).
+							MaxRetries(b.maxRetries),
+					},
+					podName: name,
+				}
+			}
+			postCache.Unlock()
+			// Brief wait before checking again
+			time.Sleep(10 * time.Millisecond)
+		}
+		// If we reach here, fall back to POST after timeout
+	}
+
+	// POST logic - create resource and add to cache if successful
+	comps = append(comps, b.resource)
+
+	// Atomic counter for synchronized unique ID generation
+	counter := atomic.AddInt64(&resourceCounter, 1)
+	timestamp := time.Now().UnixNano()
+	name := fmt.Sprintf("%s-%d-%d", b.namespace, timestamp, counter)
+
+	body, _ := utils.RenderTemplate(b.resource, map[string]interface{}{
+		"namePattern": name,
+		"namespace":   b.namespace,
+	})
+	return &PostRequester{
+		BaseRequester: BaseRequester{
+			method: "POST",
+			req:    cli.Post().AbsPath(comps...).Body(body).MaxRetries(b.maxRetries),
+		},
+		podName: name,
+	}
+
+}
+
+// PostRequester handles POST requests and only adds to cache when POST succeeds
+type PostRequester struct {
+	BaseRequester
+	podName string
+}
+
+func (reqr *PostRequester) Do(ctx context.Context) (bytes int64, err error) {
+	result := reqr.req.Do(ctx)
+	body, _ := result.Raw()
+
+	// Only add to cache if POST request was successful
+	if result.Error() == nil {
+		postCache.Lock()
+		postCache.items = append(postCache.items, reqr.podName)
+		postCache.Unlock()
+	}
+
+	return int64(len(body)), result.Error()
+}
+
+// DeleteRequester handles DELETE requests
+type DeleteRequester struct {
+	BaseRequester
+	podName string
+}
+
+func (reqr *DeleteRequester) Do(ctx context.Context) (bytes int64, err error) {
+	result := reqr.req.Do(ctx)
+	body, _ := result.Raw()
+
+	// If DELETE request failed, restore the item back to cache
+	// since the pod still exists in Kubernetes
+	if result.Error() != nil {
+		postCache.Lock()
+		postCache.items = append(postCache.items, reqr.podName)
+		postCache.Unlock()
+	}
+
+	return int64(len(body)), result.Error()
 }
 
 func toPtr[T any](v T) *T {
