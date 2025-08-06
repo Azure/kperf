@@ -98,7 +98,7 @@ func (kr *KubectlRunner) DeleteNamespace(ctx context.Context, timeout time.Durat
 	if kr.kubeCfgPath != "" {
 		args = append(args, "--kubeconfig", kr.kubeCfgPath)
 	}
-	args = append(args, "delete", "namespace", name)
+	args = append(args, "delete", "namespace", name, "--ignore-not-found=true")
 
 	_, err := runCommand(ctx, timeout, "kubectl", args)
 	return err
