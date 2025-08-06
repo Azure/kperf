@@ -7,7 +7,7 @@ import (
 
 // Cache is a thread-safe cache for storing resource names
 type Cache struct {
-	mu    sync.Mutex
+	mu sync.Mutex
 	// TODO: add cap and drop oldest item if needed
 	// https://github.com/Azure/kperf/pull/198#discussion_r2252571111
 	items *list.List
