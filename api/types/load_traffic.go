@@ -63,7 +63,7 @@ type LoadProfileSpec struct {
 	MaxRetries int `json:"maxRetries" yaml:"maxRetries"`
 	// Requests defines the different kinds of requests with weights.
 	// The executor should randomly pick by weight.
-	Requests []*WeightedRequest
+	Requests []*WeightedRequest `json:"requests" yaml:"requests"`
 }
 
 // KubeGroupVersionResource identifies the resource URI.
