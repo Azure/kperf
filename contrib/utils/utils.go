@@ -544,13 +544,16 @@ func CreateTempFileWithContent(data []byte) (_name string, _cleanup func() error
 }
 
 // Creates configmaps for benchmark.
-func CreateConfigmaps(ctx context.Context, kubeCfgPath string,
-	cmAmount int, cmSize int, cmGroupSize int, namespace string, timeout time.Duration) error {
+func CreateConfigmaps(ctx context.Context, kubeCfgPath, namespace, namePattern string,
+	cmAmount, cmSize, cmGroupSize int, timeout time.Duration) error {
 	args := []string{"data", "configmap"}
 	if kubeCfgPath != "" {
 		args = append(args, fmt.Sprintf("--kubeconfig=%s", kubeCfgPath))
 	}
-	args = append(args, fmt.Sprintf("--namespace=%s", namespace), "add", "runkperf-bench")
+	if namePattern == "" {
+		namePattern = "runkperf-bench"
+	}
+	args = append(args, fmt.Sprintf("--namespace=%s", namespace), "add", namePattern)
 	args = append(args, fmt.Sprintf("--total=%d", cmAmount))
 	args = append(args, fmt.Sprintf("--size=%d", cmSize))
 	args = append(args, fmt.Sprintf("--group-size=%d", cmGroupSize))

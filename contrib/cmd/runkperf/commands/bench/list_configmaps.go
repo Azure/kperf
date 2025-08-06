@@ -74,7 +74,7 @@ func benchListConfigmapsRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport
 	cmSize := cliCtx.Int("size")
 	cmGroupSize := cliCtx.Int("group-size")
 
-	err = utils.CreateConfigmaps(ctx, kubeCfgPath, cmAmount, cmSize, cmGroupSize, benchConfigmapNamespace, 0)
+	err = utils.CreateConfigmaps(ctx, kubeCfgPath, benchConfigmapNamespace, "runkperf-bench", cmAmount, cmSize, cmGroupSize, 0)
 	if err != nil {
 		return nil, err
 	}
