@@ -1,17 +1,22 @@
 package request
 
-import "sync"
+import (
+	"container/list"
+	"sync"
+)
 
 // Cache is a thread-safe cache for storing resource names
 type Cache struct {
 	mu    sync.Mutex
-	items []string
+	// TODO: add cap and drop oldest item if needed
+	// https://github.com/Azure/kperf/pull/198#discussion_r2252571111
+	items *list.List
 }
 
 // InitCache creates a new empty cache
 func InitCache() *Cache {
 	return &Cache{
-		items: make([]string, 0),
+		items: list.New(),
 	}
 }
 
@@ -21,12 +26,14 @@ func (c *Cache) Pop() (string, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if len(c.items) == 0 {
+	if c.items.Len() == 0 {
 		return "", false
 	}
 
-	name := c.items[0]
-	c.items = c.items[1:]
+	// Remove from front (FIFO)
+	front := c.items.Front()
+	name := front.Value.(string)
+	c.items.Remove(front)
 	return name, true
 }
 
@@ -34,12 +41,14 @@ func (c *Cache) Pop() (string, bool) {
 func (c *Cache) Push(name string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.items = append(c.items, name)
+
+	// Add new item to back
+	c.items.PushBack(name)
 }
 
 // Len returns the number of items in the cache.
 func (c *Cache) Len() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return len(c.items)
+	return c.items.Len()
 }

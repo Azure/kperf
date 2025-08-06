@@ -493,7 +493,7 @@ func (b *requestPostDelBuilder) Build(cli rest.Interface) Requester {
 	// Use builder's atomic counter for synchronized unique ID generation
 	counter := atomic.AddInt64(&b.resourceCounter, 1)
 	timestamp := time.Now().UnixNano()
-	name := fmt.Sprintf("%s-%s-%d-%d", b.resource, b.namespace, timestamp, counter)
+	name := fmt.Sprintf("%d-%d", timestamp, counter)
 
 	body, _ := utils.RenderTemplate(b.resource, map[string]interface{}{
 		"namePattern": name,
