@@ -5,6 +5,8 @@ package metrics
 
 import (
 	"container/list"
+	"fmt"
+	"regexp" // Add this import
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,9 +17,9 @@ import (
 // ResponseMetric is a measurement related to http response.
 type ResponseMetric interface {
 	// ObserveLatency observes latency.
-	ObserveLatency(url string, seconds float64)
+	ObserveLatency(method string, url string, seconds float64)
 	// ObserveFailure observes failure response.
-	ObserveFailure(url string, now time.Time, seconds float64, err error)
+	ObserveFailure(method string, url string, now time.Time, seconds float64, err error)
 	// ObserveReceivedBytes observes the bytes read from apiserver.
 	ObserveReceivedBytes(bytes int64)
 	// Gather returns the summary.
@@ -38,21 +40,34 @@ func NewResponseMetric() ResponseMetric {
 	}
 }
 
+// Aggregates for DELETE and PATCH methods
+func normalizeURL(method string, url string) string {
+	if method != "DELETE" && method != "PATCH" {
+		return url
+	}
+	// Pattern to match: https://api.../namespaces/kperf/pods/{name}?timeout=1m0s
+	re := regexp.MustCompile(`/([^/]+)/([^/?]+)(\?|$)`)
+
+	return re.ReplaceAllString(url, "/$1/{name}$3")
+}
+
 // ObserveLatency implements ResponseMetric.
-func (m *responseMetricImpl) ObserveLatency(url string, seconds float64) {
+func (m *responseMetricImpl) ObserveLatency(method string, url string, seconds float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	l, ok := m.latenciesByURLs[url]
+	normalizedURL := normalizeURL(method, url)
+	key := fmt.Sprintf("%s %s", method, normalizedURL)
+	l, ok := m.latenciesByURLs[key]
 	if !ok {
-		m.latenciesByURLs[url] = list.New()
-		l = m.latenciesByURLs[url]
+		m.latenciesByURLs[key] = list.New()
+		l = m.latenciesByURLs[key]
 	}
 	l.PushBack(seconds)
 }
 
 // ObserveFailure implements ResponseMetric.
-func (m *responseMetricImpl) ObserveFailure(url string, now time.Time, seconds float64, err error) {
+func (m *responseMetricImpl) ObserveFailure(method string, url string, now time.Time, seconds float64, err error) {
 	if err == nil {
 		return
 	}
@@ -61,7 +76,7 @@ func (m *responseMetricImpl) ObserveFailure(url string, now time.Time, seconds f
 	defer m.mu.Unlock()
 
 	oerr := types.ResponseError{
-		URL:       url,
+		URL:       fmt.Sprintf("%s %s", method, normalizeURL(method,url)),
 		Timestamp: now,
 		Duration:  seconds,
 	}
