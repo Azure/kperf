@@ -45,7 +45,7 @@ func normalizeURL(method string, url string) string {
 	if method != "DELETE" && method != "PATCH" {
 		return url
 	}
-	// Pattern to match: https://api.../namespaces/kperf/pods/{name}?timeout=1m0s
+	// Aggregated into https://api.../namespaces/{namespace}/{resourceType}/{name}?timeout=1m0s
 	re := regexp.MustCompile(`/([^/]+)/([^/?]+)(\?|$)`)
 
 	return re.ReplaceAllString(url, "/$1/{name}$3")
