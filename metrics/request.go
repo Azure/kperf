@@ -76,7 +76,7 @@ func (m *responseMetricImpl) ObserveFailure(method string, url string, now time.
 	defer m.mu.Unlock()
 
 	oerr := types.ResponseError{
-		URL:       fmt.Sprintf("%s %s", method, normalizeURL(method,url)),
+		URL:       fmt.Sprintf("%s %s", method, normalizeURL(method, url)),
 		Timestamp: now,
 		Duration:  seconds,
 	}
