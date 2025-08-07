@@ -74,14 +74,14 @@ func benchListConfigmapsRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport
 	cmSize := cliCtx.Int("size")
 	cmGroupSize := cliCtx.Int("group-size")
 
-	err = utils.CreateConfigmaps(ctx, kubeCfgPath, cmAmount, cmSize, cmGroupSize, benchConfigmapNamespace, 0)
+	err = utils.CreateConfigmaps(ctx, kubeCfgPath, benchConfigmapNamespace, "runkperf-bench", cmAmount, cmSize, cmGroupSize, 0)
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() {
 		// Delete the configmaps after the benchmark
-		err = utils.DeleteConfigmaps(ctx, kubeCfgPath, benchConfigmapNamespace, 0)
+		err = utils.DeleteConfigmaps(ctx, kubeCfgPath, benchConfigmapNamespace, "runkperf-bench", 0)
 		if err != nil {
 			log.GetLogger(ctx).WithKeyValues("level", "error").
 				LogKV("msg", fmt.Sprintf("Failed to delete configmaps: %v", err))
