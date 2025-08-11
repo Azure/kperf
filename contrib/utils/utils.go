@@ -564,7 +564,7 @@ func CreateConfigmaps(ctx context.Context, kubeCfgPath string,
 func DeleteConfigmaps(ctx context.Context, kubeCfgPath string, namespace string, timeout time.Duration) error {
 	args := []string{"data", "configmap"}
 	if kubeCfgPath != "" {
-		args = append(args, "--kubeconfig=%s", kubeCfgPath)
+		args = append(args, fmt.Sprintf("--kubeconfig=%s", kubeCfgPath))
 	}
 	args = append(args, fmt.Sprintf("--namespace=%s", namespace), "delete", "runkperf-bench")
 
