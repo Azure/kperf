@@ -550,9 +550,7 @@ func CreateConfigmaps(ctx context.Context, kubeCfgPath, namespace, namePattern s
 	if kubeCfgPath != "" {
 		args = append(args, fmt.Sprintf("--kubeconfig=%s", kubeCfgPath))
 	}
-	if namePattern == "" {
-		namePattern = "runkperf-bench"
-	}
+
 	args = append(args, fmt.Sprintf("--namespace=%s", namespace), "add", namePattern)
 	args = append(args, fmt.Sprintf("--total=%d", cmAmount))
 	args = append(args, fmt.Sprintf("--size=%d", cmSize))
