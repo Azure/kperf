@@ -15,7 +15,7 @@ loadProfile:
           version: v1
           resource: configmaps
           namespace: default
-        shares: 20
+        shares: 50
       - patch:
           version: v1
           resource: configmaps
@@ -31,4 +31,4 @@ loadProfile:
                 }
               }
             }
-        shares: 80
+        shares: 50
