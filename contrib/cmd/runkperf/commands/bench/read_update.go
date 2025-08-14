@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	_ "unsafe"
 
 	internaltypes "github.com/Azure/kperf/contrib/internal/types"
 	"github.com/Azure/kperf/contrib/utils"
@@ -107,14 +106,20 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 		return nil, fmt.Errorf("failed to create configmaps: %w", err)
 	}
 
-	defer utils.DeleteConfigmaps(ctx, kubeCfgPath, namespace, namePattern, 0)
+	defer func() {
+		// Delete the configmaps after the benchmark
+		err = utils.DeleteConfigmaps(ctx, kubeCfgPath, namespace, namePattern, 0)
+		if err != nil {
+			klog.Errorf("Failed to delete configmaps: %v", err)
+		}
+	}()
 
 	// Start to watch the configmaps
 	watches := make([]watch.Interface, 0)
 	var wg sync.WaitGroup
 	for i := 0; i < total; i++ {
 		wg.Add(1)
-		go func(index int) {
+		go func() {
 			defer wg.Done()
 			watchReq, err := client.CoreV1().ConfigMaps(namespace).
 				Watch(context.TODO(), metav1.ListOptions{
@@ -145,7 +150,7 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 				time.Sleep(2 * time.Second)
 			}
 
-		}(i)
+		}()
 	}
 	// Stop all the watches when the function returns
 	defer stopWatches(watches)
