@@ -22,7 +22,7 @@ loadProfile:
           namespace: default
           patchType: merge
           name: runkperf-cm-kperf-read-update
-          keySpaceSize: 10
+          keySpaceSize: 100
           body: |
             {
               "metadata": {
