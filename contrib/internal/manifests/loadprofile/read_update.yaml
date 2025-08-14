@@ -11,7 +11,7 @@ loadProfile:
     disableHTTP2: false
     maxRetries: 0
     requests:
-      - quorumList:
+      - staleList:
           version: v1
           resource: configmaps
           namespace: default
