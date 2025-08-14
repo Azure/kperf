@@ -169,6 +169,40 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 			spec.Profile.Spec.ContentType = types.ContentType(cliCtx.String("content-type"))
 			data, _ := yaml.Marshal(spec)
 
+			// Tweak the load profile for read-update case
+			namePattern := cliCtx.String("read-update-name-pattern")
+			ratio := cliCtx.Float64("read-ratio")
+			if ratio <= 0 || ratio > 1 {
+				return fmt.Errorf("invalid read-ratio: %.2f, must be between 0 and 1", ratio)
+			}
+
+			namespace := cliCtx.String("read-update-namespace")
+			configmapTotal := cliCtx.Int("read-update-configmap-total")
+
+			if namePattern != "" || ratio != 0 || namespace != "" || configmapTotal > 0 {
+				for _, r := range spec.Profile.Spec.Requests {
+					if r.Patch != nil {
+						if namePattern != "" {
+							r.Patch.Name = fmt.Sprintf("runkperf-cm-%s", namePattern)
+						}
+						if ratio != 0 {
+							r.Shares = 100 - int(ratio*100)
+						}
+						if namespace != "" {
+							r.Patch.Namespace = namespace
+						}
+						if configmapTotal > 0 {
+							r.Patch.KeySpaceSize = configmapTotal
+						}
+					}
+					if r.QuorumList != nil {
+						if ratio != 0 {
+							r.Shares = int(ratio * 100)
+						}
+					}
+				}
+			}
+
 			log.GetLogger(context.TODO()).
 				WithKeyValues("level", "info").
 				LogKV("msg", "dump load profile", "config", string(data))

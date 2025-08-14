@@ -1,0 +1,34 @@
+count: 10
+loadProfile:
+  version: 1
+  description: "read_update"
+  spec:
+    rate: 10
+    total: 3000
+    conns: 10
+    client: 10
+    contentType: json
+    disableHTTP2: false
+    maxRetries: 0
+    requests:
+      - quorumList:
+          version: v1
+          resource: configmaps
+          namespace: default
+        shares: 20
+      - patch:
+          version: v1
+          resource: configmaps
+          namespace: default
+          patchType: merge
+          name: runkperf-cm-kperf-read-update
+          keySpaceSize: 10
+          body: |
+            {
+              "metadata": {
+                "labels": {
+                  "test-label": "mutation-test"
+                }
+              }
+            }
+        shares: 80
