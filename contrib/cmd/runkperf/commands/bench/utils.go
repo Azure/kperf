@@ -195,7 +195,7 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 							r.Patch.KeySpaceSize = configmapTotal
 						}
 					}
-					if r.QuorumList != nil {
+					if r.StaleList != nil {
 						if ratio != 0 {
 							r.Shares = int(ratio * 100)
 						}
