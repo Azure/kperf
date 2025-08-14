@@ -127,8 +127,9 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 				fmt.Printf("Error starting watch for configmap %s: %v\n", fmt.Sprintf("%s-cm-%s-%d", appLabel, namePattern, i), err)
 				return
 			}
-
 			klog.V(5).Infof("Starting watch for configmap: %s\n", fmt.Sprintf("%s-cm-%s-%d", appLabel, namePattern, i))
+
+			// Process watch events proactively to prevent cache oversizing.
 			for {
 				select {
 				case <-dpCtx.Done():
