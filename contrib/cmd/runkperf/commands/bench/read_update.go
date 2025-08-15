@@ -171,8 +171,8 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 
 	return &internaltypes.BenchmarkReport{
 		Description: fmt.Sprintf(`
-Environment: Combine %d read requests and %d update requests during benchmarking. Workload: Deploy %d configmaps in %d KiB`,
-			100*int(cliCtx.Float64("read-ratio")), 100-100*(1-int(cliCtx.Float64("read-ratio"))), total, size*total),
+Environment: Combine %d%% read requests and %d%% update requests during benchmarking. Workload: Deploy %d configmaps in %d KiB`,
+			int(100*cliCtx.Float64("read-ratio")), 100-int(100*cliCtx.Float64("read-ratio")), total, size*total),
 		LoadSpec: *rgSpec,
 		Result:   *rgResult,
 		Info:     map[string]interface{}{},
