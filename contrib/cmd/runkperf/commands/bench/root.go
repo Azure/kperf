@@ -62,6 +62,7 @@ var Command = cli.Command{
 		benchListConfigmapsCase,
 		benchNode10Job1Pod1kCase,
 		benchNode100Job10Pod10kCase,
+		benchReadUpdateCase,
 	},
 }
 
