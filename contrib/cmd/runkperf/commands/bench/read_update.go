@@ -83,9 +83,6 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 	}
 	defer func() { _ = rgCfgFileDone() }()
 
-	dpCtx, dpCancel := context.WithCancel(ctx)
-	defer dpCancel()
-
 	total := cliCtx.Int("read-update-configmap-total")
 	size := cliCtx.Int("read-update-configmap-size")
 	namespace := cliCtx.String("read-update-namespace")
@@ -100,7 +97,7 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 		return nil, fmt.Errorf("failed to build clientset: %w", err)
 	}
 
-	err = utils.CreateConfigmaps(dpCtx, kubeCfgPath, namespace, namePattern, total, size, 2, 0)
+	err = utils.CreateConfigmaps(ctx, kubeCfgPath, namespace, namePattern, total, size, 2, 0)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create configmaps: %w", err)
@@ -114,9 +111,17 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 		}
 	}()
 
-	// Start to watch the configmaps
+	// Stop all the watches when the function returns
 	watches := make([]watch.Interface, 0)
+	defer stopWatches(watches)
+
 	var wg sync.WaitGroup
+	defer wg.Wait()
+
+	dpCtx, dpCancel := context.WithCancel(ctx)
+	defer dpCancel()
+
+	// Start to watch the configmaps
 	for i := 0; i < total; i++ {
 		wg.Add(1)
 		go func() {
@@ -152,8 +157,6 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 
 		}()
 	}
-	// Stop all the watches when the function returns
-	defer stopWatches(watches)
 
 	// Deploy the runner group
 	rgResult, derr := utils.DeployRunnerGroup(ctx,
@@ -164,12 +167,8 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 		cliCtx.GlobalString("rg-affinity"),
 	)
 
-	// Cancel the context to stop all watches
-	dpCancel()
-	wg.Wait()
-
 	if derr != nil {
-		return nil, derr
+		return nil, fmt.Errorf("failed to deploy runner group: %w", derr)
 	}
 
 	return &internaltypes.BenchmarkReport{
