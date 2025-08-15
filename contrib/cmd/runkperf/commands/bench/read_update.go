@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	internaltypes "github.com/Azure/kperf/contrib/internal/types"
 	"github.com/Azure/kperf/contrib/utils"
@@ -152,7 +151,6 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 					}
 					klog.V(5).Infof("Event received for configmap %s: %v", fmt.Sprintf("%s-cm-%s-%d", appLabel, namePattern, i), event.Type)
 				}
-				time.Sleep(2 * time.Second)
 			}
 
 		}()
