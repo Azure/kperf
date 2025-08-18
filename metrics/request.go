@@ -29,7 +29,6 @@ type responseMetricImpl struct {
 	mu              sync.Mutex
 	errors          *list.List
 	receivedBytes   int64
-	// TODO: we can maybe group into 
 	latenciesByURLs map[string]*list.List
 }
 
