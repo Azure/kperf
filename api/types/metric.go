@@ -22,6 +22,7 @@ const (
 
 // ResponseError is the record about that error.
 type ResponseError struct {
+	Method string `json:"method"`
 	// URL indicates target resource.
 	URL string `json:"url"`
 	// Timestamp indicates when this error was received.

@@ -6,7 +6,6 @@ package metrics
 import (
 	"container/list"
 	"fmt"
-	"regexp" // Add this import
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,6 +29,7 @@ type responseMetricImpl struct {
 	mu              sync.Mutex
 	errors          *list.List
 	receivedBytes   int64
+	// TODO: we can maybe group into 
 	latenciesByURLs map[string]*list.List
 }
 
@@ -40,24 +40,14 @@ func NewResponseMetric() ResponseMetric {
 	}
 }
 
-// Aggregates for DELETE and PATCH methods
-func normalizeURL(method string, url string) string {
-	if method != "DELETE" && method != "PATCH" {
-		return url
-	}
-	// Aggregated into https://api.../namespaces/{namespace}/{resourceType}/{name}?timeout=1m0s
-	re := regexp.MustCompile(`/([^/]+)/([^/?]+)(\?|$)`)
 
-	return re.ReplaceAllString(url, "/$1/{name}$3")
-}
 
 // ObserveLatency implements ResponseMetric.
 func (m *responseMetricImpl) ObserveLatency(method string, url string, seconds float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	normalizedURL := normalizeURL(method, url)
-	key := fmt.Sprintf("%s %s", method, normalizedURL)
+	key := fmt.Sprintf("%s %s", method, url)
 	l, ok := m.latenciesByURLs[key]
 	if !ok {
 		m.latenciesByURLs[key] = list.New()
@@ -76,7 +66,8 @@ func (m *responseMetricImpl) ObserveFailure(method string, url string, now time.
 	defer m.mu.Unlock()
 
 	oerr := types.ResponseError{
-		URL:       fmt.Sprintf("%s %s", method, normalizeURL(method, url)),
+		Method: method,
+		URL:       url,
 		Timestamp: now,
 		Duration:  seconds,
 	}
