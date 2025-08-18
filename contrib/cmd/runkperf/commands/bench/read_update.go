@@ -86,8 +86,8 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 	size := cliCtx.Int("read-update-configmap-size")
 	namespace := cliCtx.String("read-update-namespace")
 	namePattern := cliCtx.String("read-update-name-pattern")
-	if total <= 0 || size <= 0 || total*size > 2*1024*1024 || size > 3*1024 {
-		return nil, fmt.Errorf("invalid total (%d) or size (%d) for configmaps: total must be > 0, size must be > 0, and total*size must not exceed 2 GiB, size must not exceed 3 MiB", total, size)
+	if total <= 0 || size <= 0 || total*size > 2*1024*1024 || size > 1024 {
+		return nil, fmt.Errorf("invalid total (%d) or size (%d) for configmaps: total must be > 0, size must be > 0, and total*size must not exceed 2 GiB, size must not exceed 1 MiB", total, size)
 	}
 
 	// Create configmaps with specified name pattern
