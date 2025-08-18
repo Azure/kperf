@@ -39,8 +39,6 @@ func NewResponseMetric() ResponseMetric {
 	}
 }
 
-
-
 // ObserveLatency implements ResponseMetric.
 func (m *responseMetricImpl) ObserveLatency(method string, url string, seconds float64) {
 	m.mu.Lock()
@@ -65,7 +63,7 @@ func (m *responseMetricImpl) ObserveFailure(method string, url string, now time.
 	defer m.mu.Unlock()
 
 	oerr := types.ResponseError{
-		Method: method,
+		Method:    method,
 		URL:       url,
 		Timestamp: now,
 		Duration:  seconds,
