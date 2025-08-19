@@ -25,6 +25,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 
 	expectedErrors := []types.ResponseError{
 		{
+			Method:    "GET",
 			URL:       "0",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -32,6 +33,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Code:      429,
 		},
 		{
+			Method:    "GET",
 			URL:       "1",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -39,6 +41,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Code:      500,
 		},
 		{
+			Method:    "GET",
 			URL:       "2",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -46,6 +49,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Code:      504,
 		},
 		{
+			Method:    "GET",
 			URL:       "3",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -53,6 +57,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   "http2: server sent GOAWAY and closed the connection; ErrCode=NO_ERROR, debug=",
 		},
 		{
+			Method:    "GET",
 			URL:       "4",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -60,6 +65,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   "http2: server sent GOAWAY and closed the connection; ErrCode=PROTOCOL_ERROR, debug=",
 		},
 		{
+			Method:    "GET",
 			URL:       "5",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -67,6 +73,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   "http2: client connection lost",
 		},
 		{
+			Method:    "GET",
 			URL:       "6",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -74,6 +81,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   "http2: client connection lost",
 		},
 		{
+			Method:    "GET",
 			URL:       "7",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -81,6 +89,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   http2.ErrCode(10).String(),
 		},
 		{
+			Method:    "GET",
 			URL:       "8",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -88,6 +97,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   "net/http: TLS handshake timeout",
 		},
 		{
+			Method:    "GET",
 			URL:       "9",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -95,6 +105,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   "net/http: TLS handshake timeout",
 		},
 		{
+			Method:    "GET",
 			URL:       "10",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -102,6 +113,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   "context deadline exceeded",
 		},
 		{
+			Method:    "GET",
 			URL:       "11",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -109,6 +121,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   syscall.ECONNRESET.Error(),
 		},
 		{
+			Method:    "GET",
 			URL:       "12",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -116,6 +129,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   syscall.ECONNREFUSED.Error(),
 		},
 		{
+			Method:    "GET",
 			URL:       "13",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -123,6 +137,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 			Message:   io.ErrUnexpectedEOF.Error(),
 		},
 		{
+			Method:    "GET",
 			URL:       "14",
 			Timestamp: observedAt,
 			Duration:  dur.Seconds(),
@@ -166,7 +181,7 @@ func TestResponseMetric_ObserveFailure(t *testing.T) {
 
 	m := NewResponseMetric()
 	for idx, err := range errs {
-		m.ObserveFailure(fmt.Sprintf("%d", idx), observedAt, dur.Seconds(), err)
+		m.ObserveFailure("GET", fmt.Sprintf("%d", idx), observedAt, dur.Seconds(), err)
 	}
 	errors := m.Gather().Errors
 	assert.Equal(t, expectedErrors, errors)

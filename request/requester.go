@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
+	"path"
 	"reflect"
 	"time"
 	_ "unsafe" // unsafe to use internal function from client-go
@@ -19,6 +21,7 @@ import (
 type Requester interface {
 	Method() string
 	URL() *url.URL
+	MaskedURL() *url.URL
 	Timeout(time.Duration)
 	Do(context.Context) (bytes int64, err error)
 }
@@ -34,6 +37,22 @@ func (reqr *BaseRequester) Method() string {
 
 func (reqr *BaseRequester) URL() *url.URL {
 	return reqr.req.URL()
+}
+
+// MaskedURL returns a masked URL for DELETE and PATCH methods to enable aggregation in metrics
+func (reqr *BaseRequester) MaskedURL() *url.URL {
+	originalURL := reqr.req.URL()
+
+	// Aggregates for DELETE and PATCH methods, replaces the last path segment
+	// for DELETE and PATCH requests so they can be aggregated (e.g. in metrics)
+	if reqr.method == http.MethodDelete || reqr.method == http.MethodPatch {
+		if u, err := url.Parse(originalURL.String()); err == nil {
+			u.Path = path.Join(path.Dir(u.Path), ":name")
+			return u // String() will keep ":name" as-is
+		}
+	}
+
+	return originalURL
 }
 
 func (reqr *BaseRequester) Timeout(timeout time.Duration) {

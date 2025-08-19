@@ -5,6 +5,7 @@ package metrics
 
 import (
 	"container/list"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,9 +16,9 @@ import (
 // ResponseMetric is a measurement related to http response.
 type ResponseMetric interface {
 	// ObserveLatency observes latency.
-	ObserveLatency(url string, seconds float64)
+	ObserveLatency(method string, url string, seconds float64)
 	// ObserveFailure observes failure response.
-	ObserveFailure(url string, now time.Time, seconds float64, err error)
+	ObserveFailure(method string, url string, now time.Time, seconds float64, err error)
 	// ObserveReceivedBytes observes the bytes read from apiserver.
 	ObserveReceivedBytes(bytes int64)
 	// Gather returns the summary.
@@ -39,20 +40,21 @@ func NewResponseMetric() ResponseMetric {
 }
 
 // ObserveLatency implements ResponseMetric.
-func (m *responseMetricImpl) ObserveLatency(url string, seconds float64) {
+func (m *responseMetricImpl) ObserveLatency(method string, url string, seconds float64) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	l, ok := m.latenciesByURLs[url]
+	key := fmt.Sprintf("%s %s", method, url)
+	l, ok := m.latenciesByURLs[key]
 	if !ok {
-		m.latenciesByURLs[url] = list.New()
-		l = m.latenciesByURLs[url]
+		m.latenciesByURLs[key] = list.New()
+		l = m.latenciesByURLs[key]
 	}
 	l.PushBack(seconds)
 }
 
 // ObserveFailure implements ResponseMetric.
-func (m *responseMetricImpl) ObserveFailure(url string, now time.Time, seconds float64, err error) {
+func (m *responseMetricImpl) ObserveFailure(method string, url string, now time.Time, seconds float64, err error) {
 	if err == nil {
 		return
 	}
@@ -61,6 +63,7 @@ func (m *responseMetricImpl) ObserveFailure(url string, now time.Time, seconds f
 	defer m.mu.Unlock()
 
 	oerr := types.ResponseError{
+		Method:    method,
 		URL:       url,
 		Timestamp: now,
 		Duration:  seconds,
