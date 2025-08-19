@@ -112,7 +112,9 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 
 	// Stop all the watches when the function returns
 	watches := make([]watch.Interface, 0)
-	defer stopWatches(watches)
+	defer func() {
+		stopWatches(watches)
+	}()
 
 	var wg sync.WaitGroup
 	defer wg.Wait()
