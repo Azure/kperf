@@ -6,4 +6,4 @@ metadata:
   name: {{ .Values.name }}-init-spec
   namespace: {{ .Release.Namespace }}
 data:
-  spec: {{ .Values.runnerGroupSpec | toYaml | indent 2 }}
+  spec: {{ .Values.runnerGroupSpec | b64dec | toYaml | indent 2 }}
