@@ -5,6 +5,7 @@ package runner
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -68,6 +69,7 @@ func CreateRunnerGroupServer(ctx context.Context,
 	if err != nil {
 		return fmt.Errorf("failed to load runner group server chart: %w", err)
 	}
+	encoded := base64.StdEncoding.EncodeToString([]byte(specInStr))
 
 	releaseCli, err := helmcli.NewReleaseCli(
 		kubeconfigPath,
@@ -78,7 +80,7 @@ func CreateRunnerGroupServer(ctx context.Context,
 		helmcli.StringPathValuesApplier(
 			"name="+runnerGroupServerReleaseName,
 			"image="+runnerImage,
-			"runnerGroupSpec="+specInStr,
+			"runnerGroupSpec="+encoded,
 			// runnerVerbosity needs to be surrounded by quotes, so that YAML parse it as a string.
 			fmt.Sprintf("runnerVerbosity=\"%d\"", runnerVerbosity),
 		),
