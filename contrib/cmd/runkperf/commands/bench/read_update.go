@@ -45,7 +45,7 @@ It creates ConfigMaps, establishes watch connections, and then issues concurrent
 			},
 			cli.IntFlag{
 				Name:  "read-update-configmap-size",
-				Usage: "Size of each ConfigMap, unit: KiB. ConfigMap must not exceed 1 MiB.",
+				Usage: "Size of each ConfigMap, unit: Byte. ConfigMap must not exceed 1 MiB.",
 				Value: 1024, // 1 KiB
 			},
 			cli.StringFlag{
