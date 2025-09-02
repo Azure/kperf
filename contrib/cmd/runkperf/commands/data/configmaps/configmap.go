@@ -59,13 +59,13 @@ var configmapAddCommand = cli.Command{
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "size",
-			Usage: "The size of each configmap (Unit: KiB)",
+			Usage: "The size of each configmap (Unit: Byte)",
 			Value: 100,
 		},
 		cli.IntFlag{
 			Name:  "group-size",
 			Usage: "The size of each configmap group",
-			Value: 10,
+			Value: 30,
 		},
 		cli.IntFlag{
 			Name:  "total",
@@ -108,7 +108,7 @@ var configmapAddCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Created configmap %s with size %d KiB, group-size %d, total %d\n", cmName, size, groupSize, total)
+		fmt.Printf("Created configmap %s with size %d B, group-size %d, total %d\n", cmName, size, groupSize, total)
 		return nil
 	},
 }
@@ -299,7 +299,7 @@ func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName 
 					"app":     appLebel,
 					"cmName":  cmName,
 				}
-				data, err := randString(size * 1024)
+				data, err := randString(size)
 				if err != nil {
 					return fmt.Errorf("failed to generate random string for configmap %s: %v", name, err)
 				}
@@ -332,7 +332,7 @@ func deleteConfigmaps(clientset *kubernetes.Clientset, labelSelector string, nam
 		return fmt.Errorf("no configmaps set found in namespace: %s", namespace)
 	}
 	// Delete each configmap in parallel with fixed group size
-	n, batch := len(configMaps.Items), 10
+	n, batch := len(configMaps.Items), 300
 	for i := 0; i < n; i = i + batch {
 		g := new(errgroup.Group)
 		for j := i; j < i+batch && j < n; j++ {
