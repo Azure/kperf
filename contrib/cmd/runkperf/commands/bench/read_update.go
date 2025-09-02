@@ -125,7 +125,7 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 			defer wg.Done()
 			timeoutSeconds := int64(100000)
 
-			var watchReq watch.Interface = nil
+			var watchReq watch.Interface
 			var err error
 			defer func() {
 				if watchReq != nil {
