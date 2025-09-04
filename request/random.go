@@ -180,12 +180,12 @@ func (b *requestGetBuilder) Build(cli rest.Interface) Requester {
 	if b.namespace != "" {
 		comps = append(comps, "namespaces", b.namespace)
 	}
-	// Generate random suffix based on keySpaceSize
-	randomInt, _ := rand.Int(rand.Reader, big.NewInt(int64(b.keySpaceSize)))
-	suffix := randomInt.Int64()
 
-	// Create final resource name: name-{suffix}
-	finalName := fmt.Sprintf("%s-%d", b.name, suffix)
+	finalName := b.name
+	if b.keySpaceSize > 0 {
+		randomInt, _ := rand.Int(rand.Reader, big.NewInt(int64(b.keySpaceSize)))
+		finalName = fmt.Sprintf("%s-%d", b.name, randomInt.Int64())
+	}
 	comps = append(comps, b.resource, finalName)
 
 	return &DiscardRequester{
@@ -413,12 +413,18 @@ func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
 	if b.namespace != "" {
 		comps = append(comps, "namespaces", b.namespace)
 	}
-	// Generate random suffix based on keySpaceSize
-	randomInt, _ := rand.Int(rand.Reader, big.NewInt(int64(b.keySpaceSize)))
-	suffix := randomInt.Int64()
 
-	// Create final resource name: name-{suffix}
-	finalName := fmt.Sprintf("%s-%d", b.name, suffix)
+	var finalName string
+	if b.keySpaceSize == 0 {
+		// If keySpaceSize is 0, use name as-is
+		finalName = b.name
+	} else {
+		// Generate random suffix based on keySpaceSize
+		randomInt, _ := rand.Int(rand.Reader, big.NewInt(int64(b.keySpaceSize)))
+		suffix := randomInt.Int64()
+		// Create final resource name: name-{suffix}
+		finalName = fmt.Sprintf("%s-%d", b.name, suffix)
+	}
 	comps = append(comps, b.resource, finalName)
 
 	return &DiscardRequester{
