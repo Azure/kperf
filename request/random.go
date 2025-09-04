@@ -414,17 +414,12 @@ func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
 		comps = append(comps, "namespaces", b.namespace)
 	}
 
-	var finalName string
-	if b.keySpaceSize == 0 {
-		// If keySpaceSize is 0, use name as-is
-		finalName = b.name
-	} else {
-		// Generate random suffix based on keySpaceSize
-		randomInt, _ := rand.Int(rand.Reader, big.NewInt(int64(b.keySpaceSize)))
-		suffix := randomInt.Int64()
-		// Create final resource name: name-{suffix}
-		finalName = fmt.Sprintf("%s-%d", b.name, suffix)
-	}
+	// Generate random suffix based on keySpaceSize
+	randomInt, _ := rand.Int(rand.Reader, big.NewInt(int64(b.keySpaceSize)))
+	suffix := randomInt.Int64()
+
+	// Create final resource name: name-{suffix}
+	finalName := fmt.Sprintf("%s-%d", b.name, suffix)
 	comps = append(comps, b.resource, finalName)
 
 	return &DiscardRequester{
