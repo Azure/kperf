@@ -405,9 +405,9 @@ func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
 	if b.namespace != "" {
 		comps = append(comps, "namespaces", b.namespace)
 	}
-	
+
 	finalName := b.name
-	
+
 	if b.keySpaceSize > 0 {
 		randomInt, _ := rand.Int(rand.Reader, big.NewInt(int64(b.keySpaceSize)))
 		finalName = fmt.Sprintf("%s-%d", b.name, randomInt.Int64())
