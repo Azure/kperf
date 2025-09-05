@@ -167,7 +167,6 @@ func benchReadUpdateRun(cliCtx *cli.Context) (*internaltypes.BenchmarkReport, er
 						watchReq = nil
 					}
 					klog.V(5).Infof("Event received for configmap %s: %v", fmt.Sprintf("%s-cm-%s-%d", appLabel, namePattern, ii), event.Type)
-				case <-time.After(5 * time.Second):
 				}
 			}
 
