@@ -23,8 +23,8 @@ The test suite is to generate configmaps in a namespace and list them. The load 
 	Flags: []cli.Flag{
 		cli.IntFlag{
 			Name:  "size",
-			Usage: "The size of each configmap (Unit: KiB)",
-			Value: 100,
+			Usage: "The size of each configmap (Unit: Byte)",
+			Value: 1000,
 		},
 		cli.IntFlag{
 			Name:  "group-size",
