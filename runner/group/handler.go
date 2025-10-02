@@ -374,6 +374,11 @@ func (h *Handler) buildBatchJobObject(uploadURL string) *batchv1.Job {
 		job.OwnerReferences = append(job.OwnerReferences, *h.ownerRef)
 	}
 
+	job.Spec.Template.ObjectMeta = metav1.ObjectMeta{
+		Labels: map[string]string{
+			"app-name-job": h.name,
+		},
+	}
 	job.Spec.Template.Spec = corev1.PodSpec{
 		Affinity: &corev1.Affinity{},
 		Containers: []corev1.Container{
@@ -430,6 +435,19 @@ func (h *Handler) buildBatchJobObject(uploadURL string) *batchv1.Job {
 			},
 		},
 		RestartPolicy: corev1.RestartPolicyNever,
+		TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+			{
+				MaxSkew:           1,
+				TopologyKey:       "kubernetes.io/hostname",
+				WhenUnsatisfiable: corev1.ScheduleAnyway,
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app-name-job": h.name,
+					},
+				},
+			},
+		},
+
 		Volumes: []corev1.Volume{
 			{
 				Name: "config",
