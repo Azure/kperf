@@ -44,7 +44,7 @@ var runCommand = cli.Command{
 		},
 		cli.StringSliceFlag{
 			Name:  "affinity",
-			Usage: "Deploy server to the node with a specific labels (FORMAT: KEY=VALUE[,VALUE])",
+			Usage: "Deploy server and runners to the node with a specific labels (FORMAT: KEY=VALUE[,VALUE])",
 		},
 		cli.IntFlag{
 			Name:  "runner-verbosity",
@@ -75,6 +75,8 @@ var runCommand = cli.Command{
 		if len(specs) != 1 {
 			return fmt.Errorf("only support one runner group right now. will support it after https://github.com/Azure/kperf/issues/25")
 		}
+
+		specs[0].NodeAffinity = affinityLabels
 
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 		return runner.CreateRunnerGroupServer(context.Background(),
