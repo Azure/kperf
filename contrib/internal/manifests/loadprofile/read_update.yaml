@@ -20,15 +20,6 @@ loadProfile:
           version: v1
           resource: configmaps
           namespace: default
-          patchType: merge
           name: runkperf-cm-kperf-read-update
           keySpaceSize: 100
-          body: |
-            {
-              "metadata": {
-                "labels": {
-                  "test-label": "mutation-test"
-                }
-              }
-            }
         shares: 50
