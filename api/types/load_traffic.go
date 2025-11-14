@@ -4,9 +4,7 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
 
 	apitypes "k8s.io/apimachinery/pkg/types"
 )
@@ -165,10 +163,8 @@ type RequestPatch struct {
 	Name string `json:"name" yaml:"name"`
 	// KeySpaceSize is used to generate random number as name's suffix.
 	KeySpaceSize int `json:"keySpaceSize" yaml:"keySpaceSize"`
-	// PatchType is the type of patch, e.g. "json", "merge", "strategic-merge".
-	PatchType string `json:"patchType" yaml:"patchType"`
-	// Body is the request body, for fields to be changed.
-	Body string `json:"body" yaml:"body"`
+	// ValueSize is the object's size in bytes. how many bytes to patch data
+	ValueSize int `json:"valueSize" yaml:"valueSize"`
 }
 
 // RequestGetPodLog defines GetLog request for target pod.
@@ -362,23 +358,12 @@ func (r *RequestPatch) Validate() error {
 	if r.Name == "" {
 		return fmt.Errorf("name is required")
 	}
-	if r.Body == "" {
-		return fmt.Errorf("body is required")
+	if r.Resource == "" {
+		return fmt.Errorf("resource is required")
 	}
-
-	// Validate patch type
-	_, ok := GetPatchType(r.PatchType)
-	if !ok {
-		return fmt.Errorf("unknown patch type: %s (valid types: json, merge, strategic-merge)", r.PatchType)
+	if (r.Resource == "configmaps" || r.Resource == "secrets") && r.ValueSize <= 0 {
+		return fmt.Errorf("valueSize must > 0 for configmaps and secrets, to generate data to be patched")
 	}
-
-	// Validate JSON body and trim it
-	trimmed := strings.TrimSpace(r.Body)
-	if !json.Valid([]byte(trimmed)) {
-		return fmt.Errorf("invalid JSON in patch body: %q", r.Body)
-	}
-
-	r.Body = trimmed // Store the trimmed body
 
 	return nil
 }
