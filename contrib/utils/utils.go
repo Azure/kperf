@@ -6,9 +6,11 @@ package utils
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"sort"
@@ -39,7 +41,26 @@ var (
 	// provider ID for all the virtual nodes so that EKS cloud provider
 	// won't delete our virtual nodes.
 	EKSIdleNodepoolInstanceType = "m4.large"
+	// letterRunes contains the alphabet for random string generation
+	letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 )
+
+// randString generates a random string of specified length
+func RandString(n int) (string, error) {
+	if n <= 0 {
+		return "", fmt.Errorf("length must be positive")
+	}
+
+	b := make([]rune, n)
+	for i := range b {
+		random, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
+		if err != nil {
+			return "", fmt.Errorf("error generating random number: %w", err)
+		}
+		b[i] = letterRunes[int(random.Int64())]
+	}
+	return string(b), nil
+}
 
 // RepeatJobWithPod repeats to deploy 3k pods.
 func RepeatJobWithPod(ctx context.Context, kubeCfgPath string, namespace string,
