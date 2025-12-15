@@ -102,8 +102,14 @@ var Command = cli.Command{
 					return fmt.Errorf("failed to parse %s affinity: %w", rgAffinity, err)
 				}
 
-				spec.Profile.Spec.Total = reqs
-				spec.Profile.Spec.Rate = rate
+				// Get wrConfig from ModeConfig
+				wrConfig, ok := spec.Profile.Spec.ModeConfig.(*types.WeightedRandomConfig)
+				if !ok {
+					return fmt.Errorf("warmup requires weighted-random mode")
+				}
+
+				wrConfig.Total = reqs
+				wrConfig.Rate = rate
 				spec.NodeAffinity = affinityLabels
 
 				data, _ := yaml.Marshal(spec)

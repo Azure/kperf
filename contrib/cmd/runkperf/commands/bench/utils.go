@@ -151,9 +151,16 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 				return fmt.Errorf("invalid total-requests value: %v", reqs)
 			}
 			reqsTime := cliCtx.Int("duration")
+
+			// Get wrConfig from ModeConfig
+			wrConfig, ok := spec.Profile.Spec.ModeConfig.(*types.WeightedRandomConfig)
+			if !ok {
+				return fmt.Errorf("bench requires weighted-random mode")
+			}
+
 			if !cliCtx.IsSet("total") && reqsTime > 0 {
 				reqs = 0
-				spec.Profile.Spec.Duration = reqsTime
+				wrConfig.Duration = reqsTime
 			}
 
 			rgAffinity := cliCtx.GlobalString("rg-affinity")
@@ -163,7 +170,7 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 			}
 
 			if reqs != 0 {
-				spec.Profile.Spec.Total = reqs
+				wrConfig.Total = reqs
 			}
 			spec.NodeAffinity = affinityLabels
 			spec.Profile.Spec.ContentType = types.ContentType(cliCtx.String("content-type"))
@@ -201,8 +208,14 @@ func tweakReadUpdateProfile(cliCtx *cli.Context, spec *types.RunnerGroupSpec) er
 	namespace := cliCtx.String("read-update-namespace")
 	configmapTotal := cliCtx.Int("read-update-configmap-total")
 
+	// Get wrConfig from ModeConfig
+	wrConfig, ok := spec.Profile.Spec.ModeConfig.(*types.WeightedRandomConfig)
+	if !ok {
+		return fmt.Errorf("tweakReadUpdateProfile requires weighted-random mode")
+	}
+
 	if namePattern != "" || ratio != 0 || namespace != "" || configmapTotal > 0 {
-		for _, r := range spec.Profile.Spec.Requests {
+		for _, r := range wrConfig.Requests {
 			if r.Patch != nil {
 				if namePattern != "" {
 					r.Patch.Name = fmt.Sprintf("runkperf-cm-%s", namePattern)

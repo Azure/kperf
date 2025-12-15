@@ -104,10 +104,17 @@ var runCommand = cli.Command{
 		}
 
 		clientNum := profileCfg.Spec.Conns
+
+		// Get wrConfig from ModeConfig
+		wrConfig, ok := profileCfg.Spec.ModeConfig.(*types.WeightedRandomConfig)
+		if !ok {
+			return fmt.Errorf("runner requires weighted-random mode")
+		}
+
 		restClis, err := request.NewClients(kubeCfgPath,
 			clientNum,
 			request.WithClientUserAgentOpt(cliCtx.String("user-agent")),
-			request.WithClientQPSOpt(profileCfg.Spec.Rate),
+			request.WithClientQPSOpt(wrConfig.Rate),
 			request.WithClientContentTypeOpt(profileCfg.Spec.ContentType),
 			request.WithClientDisableHTTP2Opt(profileCfg.Spec.DisableHTTP2),
 		)
@@ -165,9 +172,15 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 		return nil, fmt.Errorf("failed to unmarshal %s from yaml format: %w", cfgPath, err)
 	}
 
+	// Get wrConfig from ModeConfig
+	wrConfig, ok := profileCfg.Spec.ModeConfig.(*types.WeightedRandomConfig)
+	if !ok {
+		return nil, fmt.Errorf("runner requires weighted-random mode")
+	}
+
 	// override value by flags
 	if v := "rate"; cliCtx.IsSet(v) {
-		profileCfg.Spec.Rate = cliCtx.Float64(v)
+		wrConfig.Rate = cliCtx.Float64(v)
 	}
 	if v := "conns"; cliCtx.IsSet(v) || profileCfg.Spec.Conns == 0 {
 		profileCfg.Spec.Conns = cliCtx.Int(v)
@@ -176,18 +189,18 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 		profileCfg.Spec.Client = cliCtx.Int(v)
 	}
 	if v := "total"; cliCtx.IsSet(v) {
-		profileCfg.Spec.Total = cliCtx.Int(v)
+		wrConfig.Total = cliCtx.Int(v)
 	}
 	if v := "duration"; cliCtx.IsSet(v) {
-		profileCfg.Spec.Duration = cliCtx.Int(v)
+		wrConfig.Duration = cliCtx.Int(v)
 	}
-	if profileCfg.Spec.Total > 0 && profileCfg.Spec.Duration > 0 {
-		klog.Warningf("both total:%v and duration:%v are set, duration will be ignored\n", profileCfg.Spec.Total, profileCfg.Spec.Duration)
-		profileCfg.Spec.Duration = 0
+	if wrConfig.Total > 0 && wrConfig.Duration > 0 {
+		klog.Warningf("both total:%v and duration:%v are set, duration will be ignored\n", wrConfig.Total, wrConfig.Duration)
+		wrConfig.Duration = 0
 	}
-	if profileCfg.Spec.Total == 0 && profileCfg.Spec.Duration == 0 {
+	if wrConfig.Total == 0 && wrConfig.Duration == 0 {
 		// Use default total value
-		profileCfg.Spec.Total = cliCtx.Int("total")
+		wrConfig.Total = cliCtx.Int("total")
 	}
 	if v := "content-type"; cliCtx.IsSet(v) || profileCfg.Spec.ContentType == "" {
 		profileCfg.Spec.ContentType = types.ContentType(cliCtx.String(v))
