@@ -37,15 +37,6 @@ func TestBuildOverridesFromCLI(t *testing.T) {
 				"duration": 120,
 			},
 		},
-		"time-series with interval": {
-			config: &TimeSeriesConfig{},
-			cliValues: map[string]interface{}{
-				"interval": "500ms",
-			},
-			expectedResult: map[string]interface{}{
-				"interval": "500ms",
-			},
-		},
 		"no overrides set": {
 			config:         &WeightedRandomConfig{},
 			cliValues:      map[string]interface{}{},
@@ -105,7 +96,6 @@ spec:
   client: 5
   contentType: json
   modeConfig:
-    interval: "2s"
     buckets:
     - startTime: 0.0
       requests:
@@ -118,7 +108,6 @@ spec:
 			validateFunc: func(t *testing.T, mc ModeConfig) {
 				tsConfig, ok := mc.(*TimeSeriesConfig)
 				require.True(t, ok)
-				assert.Equal(t, "2s", tsConfig.Interval)
 				assert.Len(t, tsConfig.Buckets, 1)
 			},
 		},

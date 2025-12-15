@@ -33,7 +33,7 @@ type ClientOptions struct {
 
 // OverridableField describes a config field that can be overridden via CLI flags.
 type OverridableField struct {
-	// Name is the field name (e.g., "rate", "total", "interval")
+	// Name is the field name (e.g., "rate", "total", "duration")
 	Name string
 	// Type describes the field type for CLI parsing
 	Type FieldType
