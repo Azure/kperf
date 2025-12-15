@@ -63,6 +63,7 @@ var Command = cli.Command{
 		benchNode10Job1Pod1kCase,
 		benchNode100Job10Pod10kCase,
 		benchReadUpdateCase,
+		benchTimeSeriesSimpleCase,
 	},
 }
 

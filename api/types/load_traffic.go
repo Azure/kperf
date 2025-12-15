@@ -52,7 +52,6 @@ func (em ExecutionMode) Validate() error {
 	}
 }
 
-
 // LoadProfile defines how to create load traffic from one host to kube-apiserver.
 type LoadProfile struct {
 	// Version defines the version of this object.
@@ -212,6 +211,7 @@ type RequestPostDel struct {
 	DeleteRatio              float64 `json:"deleteRatio" yaml:"deleteRatio"`
 }
 
+// WeightedRandomConfig defines configuration for weighted-random execution mode.
 // Validate verifies fields of LoadProfile.
 func (lp LoadProfile) Validate() error {
 	if lp.Version != 1 {
@@ -226,19 +226,19 @@ func (lp LoadProfile) Validate() error {
 func (spec *LoadProfileSpec) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Create a temporary struct that has all fields explicitly (no embedding)
 	type tempSpec struct {
-		Conns        int                    `yaml:"conns"`
-		Client       int                    `yaml:"client"`
-		ContentType  ContentType            `yaml:"contentType"`
-		DisableHTTP2 bool                   `yaml:"disableHTTP2"`
-		MaxRetries   int                    `yaml:"maxRetries"`
-		Mode         ExecutionMode          `yaml:"mode"`
-		ModeConfig   map[string]interface{} `yaml:"modeConfig"`
+		Conns        int                        `yaml:"conns"`
+		Client       int                        `yaml:"client"`
+		ContentType  ContentType                `yaml:"contentType"`
+		DisableHTTP2 bool                       `yaml:"disableHTTP2"`
+		MaxRetries   int                        `yaml:"maxRetries"`
+		Mode         ExecutionMode              `yaml:"mode"`
+		ModeConfig   map[string]interface{}     `yaml:"modeConfig"`
 
 		// Legacy fields (for backward compatibility)
-		Rate     float64            `yaml:"rate"`
-		Total    int                `yaml:"total"`
-		Duration int                `yaml:"duration"`
-		Requests []*WeightedRequest `yaml:"requests"`
+		Rate         float64                    `yaml:"rate"`
+		Total        int                        `yaml:"total"`
+		Duration     int                        `yaml:"duration"`
+		Requests     []*WeightedRequest         `yaml:"requests"`
 	}
 
 	temp := &tempSpec{}
@@ -301,19 +301,19 @@ func (spec *LoadProfileSpec) UnmarshalYAML(unmarshal func(interface{}) error) er
 func (spec *LoadProfileSpec) UnmarshalJSON(data []byte) error {
 	// Create a temporary struct that has all fields explicitly (no embedding)
 	type tempSpec struct {
-		Conns        int                    `json:"conns"`
-		Client       int                    `json:"client"`
-		ContentType  ContentType            `json:"contentType"`
-		DisableHTTP2 bool                   `json:"disableHTTP2"`
-		MaxRetries   int                    `json:"maxRetries"`
-		Mode         ExecutionMode          `json:"mode"`
-		ModeConfig   map[string]interface{} `json:"modeConfig"`
+		Conns        int                        `json:"conns"`
+		Client       int                        `json:"client"`
+		ContentType  ContentType                `json:"contentType"`
+		DisableHTTP2 bool                       `json:"disableHTTP2"`
+		MaxRetries   int                        `json:"maxRetries"`
+		Mode         ExecutionMode              `json:"mode"`
+		ModeConfig   map[string]interface{}     `json:"modeConfig"`
 
 		// Legacy fields (for backward compatibility)
-		Rate     float64            `json:"rate"`
-		Total    int                `json:"total"`
-		Duration int                `json:"duration"`
-		Requests []*WeightedRequest `json:"requests"`
+		Rate         float64                    `json:"rate"`
+		Total        int                        `json:"total"`
+		Duration     int                        `json:"duration"`
+		Requests     []*WeightedRequest         `json:"requests"`
 	}
 
 	temp := &tempSpec{}
@@ -357,11 +357,11 @@ func (spec *LoadProfileSpec) UnmarshalJSON(data []byte) error {
 		}
 
 		// Convert map to JSON bytes and unmarshal into typed struct
-		data, err := json.Marshal(temp.ModeConfig)
+		configData, err := json.Marshal(temp.ModeConfig)
 		if err != nil {
 			return fmt.Errorf("failed to marshal modeConfig: %w", err)
 		}
-		if err := json.Unmarshal(data, config); err != nil {
+		if err := json.Unmarshal(configData, config); err != nil {
 			return fmt.Errorf("failed to unmarshal modeConfig for mode %s: %w", temp.Mode, err)
 		}
 		spec.ModeConfig = config

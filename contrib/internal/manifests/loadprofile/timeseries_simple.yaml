@@ -1,0 +1,50 @@
+count: 10
+loadProfile:
+  version: 1
+  description: Simple time-series replay benchmark for testing time-series executor
+  spec:
+    conns: 10
+    client: 100
+    contentType: json
+    disableHTTP2: false
+    maxRetries: 0
+    mode: time-series
+    modeConfig:
+      interval: "1s"
+      buckets:
+      - startTime: 0.0
+        requests:
+        - method: LIST
+          version: v1
+          resource: pods
+          namespace: default
+          resourceVersion: "0"
+        - method: LIST
+          version: v1
+          resource: configmaps
+          namespace: default
+          limit: 100
+      - startTime: 1.0
+        requests:
+        - method: GET
+          version: v1
+          resource: pods
+          namespace: default
+          name: test-pod-1
+        - method: LIST
+          version: v1
+          resource: pods
+          namespace: default
+          limit: 1000
+      - startTime: 2.0
+        requests:
+        - method: LIST
+          version: v1
+          resource: events
+          namespace: default
+          limit: 500
+        - method: GET
+          version: v1
+          resource: configmaps
+          namespace: default
+          name: test-cm-1
