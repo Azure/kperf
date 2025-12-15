@@ -11,6 +11,7 @@ import (
 	"time"
 	_ "unsafe" // unsafe to use internal function from client-go
 
+	"github.com/Azure/kperf/request/executor"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/rest"
@@ -18,13 +19,8 @@ import (
 	"k8s.io/utils/clock"
 )
 
-type Requester interface {
-	Method() string
-	URL() *url.URL
-	MaskedURL() *url.URL
-	Timeout(time.Duration)
-	Do(context.Context) (bytes int64, err error)
-}
+// Requester is a type alias for executor.Requester.
+type Requester = executor.Requester
 
 type BaseRequester struct {
 	method string

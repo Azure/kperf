@@ -6,15 +6,15 @@ package request
 import (
 	"context"
 	"errors"
-	"math"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/Azure/kperf/api/types"
 	"github.com/Azure/kperf/metrics"
+	"github.com/Azure/kperf/request/executor"
 
 	"golang.org/x/net/http2"
-	"golang.org/x/time/rate"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 )
@@ -30,46 +30,59 @@ type Result struct {
 	Total int
 }
 
-// Schedule files requests to apiserver based on LoadProfileSpec.
+// Schedule executes requests to apiserver based on LoadProfileSpec using the executor pattern.
 func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.Interface) (*Result, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	rndReqs, err := NewWeightedRandomRequests(spec)
+	// Create executor for the specified mode
+	exec, err := executor.CreateExecutor(spec)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create executor: %v", err)
 	}
+	defer exec.Stop()
 
-	qps := spec.Rate
-	if qps == 0 {
-		qps = float64(math.MaxInt32)
-	}
-	limiter := rate.NewLimiter(rate.Limit(qps), 1)
+	// Get metadata for logging
+	metadata := exec.Metadata()
 
+	// Get execution context with mode-specific timeouts
+	execCtx, execCancel := exec.GetExecutionContext(ctx)
+	defer execCancel()
+
+	// Get rate limiter (nil if mode doesn't need it)
+	limiter := exec.GetRateLimiter()
+
+	// Worker pool - start workers BEFORE executor to avoid unbuffered channel deadlock
 	clients := spec.Client
 	if clients == 0 {
 		clients = spec.Conns
 	}
 
-	reqBuilderCh := rndReqs.Chan()
+	respMetric := metrics.NewResponseMetric()
 	var wg sync.WaitGroup
 
-	respMetric := metrics.NewResponseMetric()
+	reqBuilderCh := exec.Chan()
 	for i := 0; i < clients; i++ {
-		// reuse connection if clients > conns
 		cli := restCli[i%len(restCli)]
 		wg.Add(1)
-		go func(cli rest.Interface) {
+		go func(workerID int, cli rest.Interface) {
 			defer wg.Done()
 
-			for builder := range reqBuilderCh {
-				req := builder.Build(cli)
+			klog.V(5).Infof("Worker %d started, waiting for requests", workerID)
+			requestCount := 0
 
-				if err := limiter.Wait(ctx); err != nil {
-					klog.V(5).Infof("Rate limiter wait failed: %v", err)
-					cancel()
-					return
+			for builder := range reqBuilderCh {
+				// Apply rate limiting (if configured)
+				if limiter != nil {
+					if err := limiter.Wait(ctx); err != nil {
+						klog.V(5).Infof("Worker %d: Rate limiter wait failed: %v", workerID, err)
+						return
+					}
 				}
+
+				requestCount++
+				klog.V(8).Infof("Worker %d received request #%d", workerID, requestCount)
+				req := builder.Build(cli)
 
 				klog.V(5).Infof("Request URL: %s", req.URL())
 
@@ -111,30 +124,40 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 					respMetric.ObserveLatency(req.Method(), req.MaskedURL().String(), latency)
 				}()
 			}
-		}(cli)
+
+			klog.V(5).Infof("Worker %d finished: processed %d requests", workerID, requestCount)
+		}(i, cli)
 	}
 
-	klog.V(2).InfoS("Setting",
+	// Extract rate from metadata for logging (mode-specific)
+	rate, _ := metadata.Custom["rate"].(float64)
+
+	klog.V(2).InfoS("Schedule started",
+		"mode", spec.Mode,
 		"clients", clients,
 		"connections", len(restCli),
-		"rate", qps,
-		"total", spec.Total,
-		"duration", spec.Duration,
+		"rate", rate,
+		"expectedTotal", metadata.ExpectedTotal,
+		"expectedDuration", metadata.ExpectedDuration,
 		"http2", !spec.DisableHTTP2,
 		"content-type", spec.ContentType,
 	)
 
 	start := time.Now()
 
-	if spec.Duration > 0 {
-		// If duration is set, we will run for duration.
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(spec.Duration)*time.Second)
-		defer cancel()
-	}
-	rndReqs.Run(ctx, spec.Total)
+	// Start executor AFTER workers are ready to receive
+	go func() {
+		if err := exec.Run(execCtx); err != nil && err != context.Canceled {
+			klog.Errorf("Executor error: %v", err)
+		}
+		// Signal completion (success or failure)
+		cancel()
+	}()
 
-	rndReqs.Stop()
+	// Wait for completion
+	<-ctx.Done()
+
+	exec.Stop()
 	wg.Wait()
 
 	totalDuration := time.Since(start)
@@ -142,7 +165,7 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 	return &Result{
 		ResponseStats: responseStats,
 		Duration:      totalDuration,
-		Total:         spec.Total,
+		Total:         metadata.ExpectedTotal,
 	}, nil
 }
 

@@ -8,12 +8,12 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/Azure/kperf/api/types"
 	"github.com/Azure/kperf/contrib/utils"
+	"github.com/Azure/kperf/request/executor"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,125 +23,8 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// WeightedRandomRequests is used to generate requests based on LoadProfileSpec.
-type WeightedRandomRequests struct {
-	once         sync.Once
-	wg           sync.WaitGroup
-	ctx          context.Context
-	cancel       context.CancelFunc
-	reqBuilderCh chan RESTRequestBuilder
-
-	shares      []int
-	reqBuilders []RESTRequestBuilder
-}
-
-// NewWeightedRandomRequests creates new instance of WeightedRandomRequests.
-func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequests, error) {
-	if err := spec.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid load profile spec: %v", err)
-	}
-
-	shares := make([]int, 0, len(spec.Requests))
-	reqBuilders := make([]RESTRequestBuilder, 0, len(spec.Requests))
-	for _, r := range spec.Requests {
-		shares = append(shares, r.Shares)
-
-		var builder RESTRequestBuilder
-		switch {
-		case r.StaleList != nil:
-			builder = newRequestListBuilder(r.StaleList, "0", spec.MaxRetries)
-		case r.QuorumList != nil:
-			builder = newRequestListBuilder(r.QuorumList, "", spec.MaxRetries)
-		case r.WatchList != nil:
-			builder = newRequestWatchListBuilder(r.WatchList, spec.MaxRetries)
-		case r.StaleGet != nil:
-			builder = newRequestGetBuilder(r.StaleGet, "0", spec.MaxRetries)
-		case r.QuorumGet != nil:
-			builder = newRequestGetBuilder(r.QuorumGet, "", spec.MaxRetries)
-		case r.GetPodLog != nil:
-			builder = newRequestGetPodLogBuilder(r.GetPodLog, spec.MaxRetries)
-		case r.Patch != nil:
-			builder = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
-		case r.PostDel != nil:
-			builder = newRequestPostDelBuilder(r.PostDel, "", spec.MaxRetries)
-		default:
-			return nil, fmt.Errorf("not implement for PUT yet")
-		}
-		reqBuilders = append(reqBuilders, builder)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	return &WeightedRandomRequests{
-		ctx:          ctx,
-		cancel:       cancel,
-		reqBuilderCh: make(chan RESTRequestBuilder),
-		shares:       shares,
-		reqBuilders:  reqBuilders,
-	}, nil
-}
-
-// Run starts to random pick request.
-func (r *WeightedRandomRequests) Run(ctx context.Context, total int) {
-	defer r.wg.Done()
-	r.wg.Add(1)
-
-	sum := 0
-	for {
-		if total > 0 && sum >= total {
-			break
-		}
-		builder := r.randomPick()
-		select {
-		case r.reqBuilderCh <- builder:
-			sum++
-		case <-r.ctx.Done():
-			return
-		case <-ctx.Done():
-			return
-		}
-	}
-}
-
-// Chan returns channel to get random request.
-func (r *WeightedRandomRequests) Chan() chan RESTRequestBuilder {
-	return r.reqBuilderCh
-}
-
-func (r *WeightedRandomRequests) randomPick() RESTRequestBuilder {
-	sum := 0
-	for _, s := range r.shares {
-		sum += s
-	}
-
-	rndInt, err := rand.Int(rand.Reader, big.NewInt(int64(sum)))
-	if err != nil {
-		panic(err)
-	}
-
-	rnd := rndInt.Int64()
-	for i := range r.shares {
-		s := int64(r.shares[i])
-		if rnd < s {
-			return r.reqBuilders[i]
-		}
-		rnd -= s
-	}
-	panic("unreachable")
-}
-
-// Stop stops request generator.
-func (r *WeightedRandomRequests) Stop() {
-	r.once.Do(func() {
-		r.cancel()
-		r.wg.Wait()
-		close(r.reqBuilderCh)
-	})
-}
-
 // RESTRequestBuilder is used to build rest.Request.
-type RESTRequestBuilder interface {
-	Build(cli rest.Interface) Requester
-}
+type RESTRequestBuilder = executor.RESTRequestBuilder
 
 type requestGetBuilder struct {
 	version         schema.GroupVersion
