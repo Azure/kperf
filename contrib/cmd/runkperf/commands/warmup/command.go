@@ -102,8 +102,14 @@ var Command = cli.Command{
 					return fmt.Errorf("failed to parse %s affinity: %w", rgAffinity, err)
 				}
 
-				spec.Profile.Spec.Total = reqs
-				spec.Profile.Spec.Rate = rate
+				// Build overrides from the function parameters
+				overrides := map[string]interface{}{
+					"total": reqs,
+					"rate":  rate,
+				}
+				if err := spec.Profile.Spec.ModeConfig.ApplyOverrides(overrides); err != nil {
+					return fmt.Errorf("failed to apply config overrides: %w", err)
+				}
 				spec.NodeAffinity = affinityLabels
 
 				data, _ := yaml.Marshal(spec)

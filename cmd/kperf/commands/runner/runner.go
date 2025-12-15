@@ -15,7 +15,6 @@ import (
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/metrics"
 	"github.com/Azure/kperf/request"
-	"k8s.io/klog/v2"
 
 	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
@@ -104,10 +103,14 @@ var runCommand = cli.Command{
 		}
 
 		clientNum := profileCfg.Spec.Conns
+
+		// Get mode-specific client options
+		clientOpts := profileCfg.Spec.ModeConfig.ConfigureClientOptions()
+
 		restClis, err := request.NewClients(kubeCfgPath,
 			clientNum,
 			request.WithClientUserAgentOpt(cliCtx.String("user-agent")),
-			request.WithClientQPSOpt(profileCfg.Spec.Rate),
+			request.WithClientQPSOpt(clientOpts.QPS),
 			request.WithClientContentTypeOpt(profileCfg.Spec.ContentType),
 			request.WithClientDisableHTTP2Opt(profileCfg.Spec.DisableHTTP2),
 		)
@@ -165,29 +168,12 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 		return nil, fmt.Errorf("failed to unmarshal %s from yaml format: %w", cfgPath, err)
 	}
 
-	// override value by flags
-	if v := "rate"; cliCtx.IsSet(v) {
-		profileCfg.Spec.Rate = cliCtx.Float64(v)
-	}
+	// Apply CLI overrides to common fields
 	if v := "conns"; cliCtx.IsSet(v) || profileCfg.Spec.Conns == 0 {
 		profileCfg.Spec.Conns = cliCtx.Int(v)
 	}
 	if v := "client"; cliCtx.IsSet(v) || profileCfg.Spec.Client == 0 {
 		profileCfg.Spec.Client = cliCtx.Int(v)
-	}
-	if v := "total"; cliCtx.IsSet(v) {
-		profileCfg.Spec.Total = cliCtx.Int(v)
-	}
-	if v := "duration"; cliCtx.IsSet(v) {
-		profileCfg.Spec.Duration = cliCtx.Int(v)
-	}
-	if profileCfg.Spec.Total > 0 && profileCfg.Spec.Duration > 0 {
-		klog.Warningf("both total:%v and duration:%v are set, duration will be ignored\n", profileCfg.Spec.Total, profileCfg.Spec.Duration)
-		profileCfg.Spec.Duration = 0
-	}
-	if profileCfg.Spec.Total == 0 && profileCfg.Spec.Duration == 0 {
-		// Use default total value
-		profileCfg.Spec.Total = cliCtx.Int("total")
 	}
 	if v := "content-type"; cliCtx.IsSet(v) || profileCfg.Spec.ContentType == "" {
 		profileCfg.Spec.ContentType = types.ContentType(cliCtx.String(v))
@@ -197,6 +183,22 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 	}
 	if v := "max-retries"; cliCtx.IsSet(v) {
 		profileCfg.Spec.MaxRetries = cliCtx.Int(v)
+	}
+
+	// Apply mode-specific CLI flag overrides
+	modeOverrides := types.BuildOverridesFromCLI(profileCfg.Spec.ModeConfig, cliCtx)
+	if len(modeOverrides) > 0 {
+		if err := profileCfg.Spec.ModeConfig.ApplyOverrides(modeOverrides); err != nil {
+			return nil, fmt.Errorf("failed to apply config overrides: %w", err)
+		}
+	}
+
+	// Mode-specific validation with defaults
+	defaultOverrides := map[string]interface{}{
+		"total": cliCtx.Int("total"),
+	}
+	if err := profileCfg.Spec.ModeConfig.Validate(defaultOverrides); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
 	if err := profileCfg.Validate(); err != nil {

@@ -150,20 +150,20 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 			if reqs < 0 {
 				return fmt.Errorf("invalid total-requests value: %v", reqs)
 			}
-			reqsTime := cliCtx.Int("duration")
-			if !cliCtx.IsSet("total") && reqsTime > 0 {
-				reqs = 0
-				spec.Profile.Spec.Duration = reqsTime
+			// Apply CLI overrides automatically
+			if spec != nil && spec.Profile.Spec.ModeConfig != nil {
+				overrides := types.BuildOverridesFromCLI(spec.Profile.Spec.ModeConfig, cliCtx)
+				if len(overrides) > 0 {
+					if err := spec.Profile.Spec.ModeConfig.ApplyOverrides(overrides); err != nil {
+						return fmt.Errorf("failed to apply config overrides: %w", err)
+					}
+				}
 			}
 
 			rgAffinity := cliCtx.GlobalString("rg-affinity")
 			affinityLabels, err := kperfcmdutils.KeyValuesMap([]string{rgAffinity})
 			if err != nil {
 				return fmt.Errorf("failed to parse %s affinity: %w", rgAffinity, err)
-			}
-
-			if reqs != 0 {
-				spec.Profile.Spec.Total = reqs
 			}
 			spec.NodeAffinity = affinityLabels
 			spec.Profile.Spec.ContentType = types.ContentType(cliCtx.String("content-type"))
@@ -202,27 +202,29 @@ func tweakReadUpdateProfile(cliCtx *cli.Context, spec *types.RunnerGroupSpec) er
 	configmapTotal := cliCtx.Int("read-update-configmap-total")
 
 	if namePattern != "" || ratio != 0 || namespace != "" || configmapTotal > 0 {
-		for _, r := range spec.Profile.Spec.Requests {
-			if r.Patch != nil {
-				if namePattern != "" {
-					r.Patch.Name = fmt.Sprintf("runkperf-cm-%s", namePattern)
+		if wrConfig, ok := spec.Profile.Spec.ModeConfig.(*types.WeightedRandomConfig); ok && wrConfig != nil {
+			for _, r := range wrConfig.Requests {
+				if r.Patch != nil {
+					if namePattern != "" {
+						r.Patch.Name = fmt.Sprintf("runkperf-cm-%s", namePattern)
+					}
+					if ratio != 0 {
+						r.Shares = 100 - int(ratio*100)
+					}
+					if namespace != "" {
+						r.Patch.Namespace = namespace
+					}
+					if configmapTotal > 0 {
+						r.Patch.KeySpaceSize = configmapTotal
+					}
 				}
-				if ratio != 0 {
-					r.Shares = 100 - int(ratio*100)
-				}
-				if namespace != "" {
-					r.Patch.Namespace = namespace
-				}
-				if configmapTotal > 0 {
-					r.Patch.KeySpaceSize = configmapTotal
-				}
-			}
-			if r.StaleList != nil {
-				if ratio != 0 {
-					r.Shares = int(ratio * 100)
-				}
-				if namespace != "" {
-					r.StaleList.Namespace = namespace
+				if r.StaleList != nil {
+					if ratio != 0 {
+						r.Shares = int(ratio * 100)
+					}
+					if namespace != "" {
+						r.StaleList.Namespace = namespace
+					}
 				}
 			}
 		}
