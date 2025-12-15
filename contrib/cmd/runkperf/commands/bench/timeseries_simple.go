@@ -84,7 +84,7 @@ func benchTimeSeriesSimpleCaseRun(cliCtx *cli.Context) (*internaltypes.Benchmark
 		Description: fmt.Sprintf(`
 Environment: 10 virtual nodes managed by kwok-controller
 Workload: Deploy 1 job with 100 pods repeatedly. The parallelism is 100. The interval is %v
-Mode: time-series replay with 3 time buckets (1s intervals)`, jobInterval),
+Mode: time-series replay with 3 time buckets`, jobInterval),
 		LoadSpec: *rgSpec,
 		Result:   *rgResult,
 		Info:     make(map[string]interface{}),

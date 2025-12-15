@@ -10,7 +10,6 @@ loadProfile:
     maxRetries: 0
     mode: time-series
     modeConfig:
-      interval: "1s"
       buckets:
       - startTime: 0.0
         requests:
