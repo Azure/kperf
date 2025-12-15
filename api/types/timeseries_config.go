@@ -7,8 +7,6 @@ import "fmt"
 
 // TimeSeriesConfig defines configuration for time-series execution mode.
 type TimeSeriesConfig struct {
-	// Interval defines the time bucket size (e.g., "1s", "60s").
-	Interval string `json:"interval" yaml:"interval" mapstructure:"interval"`
 	// Buckets contains the time-bucketed requests.
 	Buckets []RequestBucket `json:"buckets" yaml:"buckets" mapstructure:"buckets"`
 }
@@ -54,28 +52,16 @@ func (*TimeSeriesConfig) isModeConfig() {}
 
 // GetOverridableFields implements ModeConfig for TimeSeriesConfig
 func (c *TimeSeriesConfig) GetOverridableFields() []OverridableField {
-	return []OverridableField{
-		{
-			Name:        "interval",
-			Type:        FieldTypeString,
-			Description: "Time bucket interval (e.g., '1s', '100ms')",
-		},
-	}
+	// Time-series mode has no CLI-overridable fields
+	// Bucket timing is defined in the load profile itself
+	return []OverridableField{}
 }
 
 // ApplyOverrides implements ModeConfig for TimeSeriesConfig
 func (c *TimeSeriesConfig) ApplyOverrides(overrides map[string]interface{}) error {
-	for key, value := range overrides {
-		switch key {
-		case "interval":
-			if v, ok := value.(string); ok {
-				c.Interval = v
-			} else {
-				return fmt.Errorf("interval must be string, got %T", value)
-			}
-		default:
-			return fmt.Errorf("unknown override key for time-series mode: %s", key)
-		}
+	// Time-series mode has no overridable fields
+	if len(overrides) > 0 {
+		return fmt.Errorf("time-series mode does not support CLI overrides")
 	}
 	return nil
 }
@@ -83,7 +69,7 @@ func (c *TimeSeriesConfig) ApplyOverrides(overrides map[string]interface{}) erro
 // Validate implements ModeConfig for TimeSeriesConfig
 func (c *TimeSeriesConfig) Validate(defaultOverrides map[string]interface{}) error {
 	// Time-series mode doesn't have conflicting settings or defaults
-	// Could add validation for interval format, bucket ordering, etc.
+	// Could add validation for bucket ordering, etc.
 	return nil
 }
 

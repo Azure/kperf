@@ -15,42 +15,27 @@ func TestTimeSeriesConfigGetOverridableFields(t *testing.T) {
 	config := &TimeSeriesConfig{}
 	fields := config.GetOverridableFields()
 
-	assert.Len(t, fields, 1)
-	assert.Equal(t, "interval", fields[0].Name)
-	assert.Equal(t, FieldTypeString, fields[0].Type)
-	assert.Contains(t, fields[0].Description, "Time bucket")
+	// Time-series mode has no CLI-overridable fields
+	assert.Len(t, fields, 0)
 }
 
 func TestTimeSeriesConfigApplyOverrides(t *testing.T) {
 	tests := map[string]struct {
 		initial   TimeSeriesConfig
 		overrides map[string]interface{}
-		expected  TimeSeriesConfig
 		err       bool
 	}{
-		"interval override": {
-			initial: TimeSeriesConfig{Interval: "1s"},
+		"no overrides": {
+			initial:   TimeSeriesConfig{},
+			overrides: map[string]interface{}{},
+			err:       false,
+		},
+		"any override fails": {
+			initial: TimeSeriesConfig{},
 			overrides: map[string]interface{}{
 				"interval": "100ms",
 			},
-			expected: TimeSeriesConfig{Interval: "100ms"},
-			err:      false,
-		},
-		"invalid interval type": {
-			initial: TimeSeriesConfig{Interval: "1s"},
-			overrides: map[string]interface{}{
-				"interval": 123,
-			},
-			expected: TimeSeriesConfig{Interval: "1s"},
-			err:      true,
-		},
-		"unknown key": {
-			initial: TimeSeriesConfig{Interval: "1s"},
-			overrides: map[string]interface{}{
-				"unknown": "value",
-			},
-			expected: TimeSeriesConfig{Interval: "1s"},
-			err:      true,
+			err: true,
 		},
 	}
 
@@ -62,14 +47,13 @@ func TestTimeSeriesConfigApplyOverrides(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tc.expected.Interval, config.Interval)
 			}
 		})
 	}
 }
 
 func TestTimeSeriesConfigValidate(t *testing.T) {
-	config := &TimeSeriesConfig{Interval: "1s"}
+	config := &TimeSeriesConfig{}
 	err := config.Validate(nil)
 	assert.NoError(t, err)
 }
@@ -90,7 +74,6 @@ spec:
   contentType: json
   mode: time-series
   modeConfig:
-    interval: "1s"
     buckets:
     - startTime: 0.0
       requests:
@@ -125,7 +108,6 @@ spec:
 	require.True(t, ok, "ModeConfig should be *TimeSeriesConfig")
 	require.NotNil(t, tsConfig)
 
-	assert.Equal(t, "1s", tsConfig.Interval)
 	assert.Len(t, tsConfig.Buckets, 2)
 
 	assert.Equal(t, 0.0, tsConfig.Buckets[0].StartTime)
