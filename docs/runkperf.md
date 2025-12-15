@@ -98,7 +98,7 @@ You will see that summary when runners finish, like
               "resource": "pods",
               "namespace": "",
               "limit": 0,
-              "seletor": "",
+              "selector": "",
               "fieldSelector": ""
             }
           },
@@ -110,7 +110,7 @@ You will see that summary when runners finish, like
               "resource": "pods",
               "namespace": "",
               "limit": 1000,
-              "seletor": "",
+              "selector": "",
               "fieldSelector": ""
             }
           },
@@ -122,7 +122,7 @@ You will see that summary when runners finish, like
               "resource": "events",
               "namespace": "",
               "limit": 1000,
-              "seletor": "",
+              "selector": "",
               "fieldSelector": ""
             }
           }

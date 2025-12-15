@@ -41,7 +41,7 @@ spec:
       version: v1
       resource: pods
       namespace: default
-      seletor: app=x2
+      selector: app=x2
       fieldSelector: spec.nodeName=x
     shares: 200
   - quorumList:
@@ -50,7 +50,7 @@ spec:
       resource: configmaps
       namespace: default
       limit: 10000
-      seletor: app=x3
+      selector: app=x3
     shares: 400
   - put:
       group: core
@@ -73,7 +73,7 @@ spec:
       version: v1
       resource: pods
       namespace: default
-      seletor: app=x2
+      selector: app=x2
       fieldSelector: spec.nodeName=x
     shares: 250
 `
