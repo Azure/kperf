@@ -17,7 +17,6 @@ import (
 type TimeSeriesExecutor struct {
 	config       *types.TimeSeriesConfig
 	spec         *types.LoadProfileSpec
-	interval     time.Duration
 	buckets      []types.RequestBucket
 	reqBuilderCh chan RESTRequestBuilder
 	ctx          context.Context
@@ -42,16 +41,10 @@ func NewTimeSeriesExecutor(spec *types.LoadProfileSpec) (Executor, error) {
 		return nil, fmt.Errorf("invalid config type for time-series mode")
 	}
 
-	interval, err := time.ParseDuration(config.Interval)
-	if err != nil {
-		return nil, fmt.Errorf("invalid interval: %v", err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	return &TimeSeriesExecutor{
 		config:       config,
 		spec:         spec,
-		interval:     interval,
 		buckets:      config.Buckets,
 		reqBuilderCh: make(chan RESTRequestBuilder),
 		ctx:          ctx,
@@ -129,7 +122,6 @@ func (e *TimeSeriesExecutor) Metadata() ExecutorMetadata {
 		Custom: map[string]interface{}{
 			"mode":         string(types.ModeTimeSeries),
 			"bucket_count": len(e.buckets),
-			"interval":     e.interval.String(),
 		},
 	}
 }
