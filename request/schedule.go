@@ -40,7 +40,13 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 		return nil, err
 	}
 
-	qps := spec.Rate
+	// Get rate from ModeConfig
+	wrConfig, ok := spec.ModeConfig.(*types.WeightedRandomConfig)
+	if !ok {
+		return nil, errors.New("schedule requires weighted-random mode")
+	}
+
+	qps := wrConfig.Rate
 	if qps == 0 {
 		qps = float64(math.MaxInt32)
 	}
@@ -118,21 +124,21 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 		"clients", clients,
 		"connections", len(restCli),
 		"rate", qps,
-		"total", spec.Total,
-		"duration", spec.Duration,
+		"total", wrConfig.Total,
+		"duration", wrConfig.Duration,
 		"http2", !spec.DisableHTTP2,
 		"content-type", spec.ContentType,
 	)
 
 	start := time.Now()
 
-	if spec.Duration > 0 {
+	if wrConfig.Duration > 0 {
 		// If duration is set, we will run for duration.
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, time.Duration(spec.Duration)*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(wrConfig.Duration)*time.Second)
 		defer cancel()
 	}
-	rndReqs.Run(ctx, spec.Total)
+	rndReqs.Run(ctx, wrConfig.Total)
 
 	rndReqs.Stop()
 	wg.Wait()
@@ -142,7 +148,7 @@ func Schedule(ctx context.Context, spec *types.LoadProfileSpec, restCli []rest.I
 	return &Result{
 		ResponseStats: responseStats,
 		Duration:      totalDuration,
-		Total:         spec.Total,
+		Total:         wrConfig.Total,
 	}, nil
 }
 

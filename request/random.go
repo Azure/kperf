@@ -41,9 +41,15 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 		return nil, fmt.Errorf("invalid load profile spec: %v", err)
 	}
 
-	shares := make([]int, 0, len(spec.Requests))
-	reqBuilders := make([]RESTRequestBuilder, 0, len(spec.Requests))
-	for _, r := range spec.Requests {
+	// Get requests from ModeConfig
+	wrConfig, ok := spec.ModeConfig.(*types.WeightedRandomConfig)
+	if !ok {
+		return nil, fmt.Errorf("weighted random requests requires weighted-random mode")
+	}
+
+	shares := make([]int, 0, len(wrConfig.Requests))
+	reqBuilders := make([]RESTRequestBuilder, 0, len(wrConfig.Requests))
+	for _, r := range wrConfig.Requests {
 		shares = append(shares, r.Shares)
 
 		var builder RESTRequestBuilder
