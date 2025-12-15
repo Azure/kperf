@@ -120,7 +120,7 @@ type RequestList struct {
 	// Limit defines the page size.
 	Limit int `json:"limit" yaml:"limit"`
 	// Selector defines how to identify a set of objects.
-	Selector string `json:"seletor" yaml:"seletor"`
+	Selector string `json:"selector" yaml:"selector"`
 	// FieldSelector defines how to identify a set of objects with field selector.
 	FieldSelector string `json:"fieldSelector" yaml:"fieldSelector"`
 }
