@@ -28,5 +28,5 @@ loadProfile:
           # including kubelet, when they want to get pods from ETCD. The limit
           # is 100 because it's close to MaxPods value.
           limit: 100
-          seletor: "app=benchmark"
+          selector: "app=benchmark"
         shares: 200 # 200 / (1000 + 100 + 200) * 10 = 1.5 req/s
