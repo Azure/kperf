@@ -151,9 +151,10 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 				return fmt.Errorf("invalid total-requests value: %v", reqs)
 			}
 			reqsTime := cliCtx.Int("duration")
+			specs := spec.Profile.GetSpecs()
 			if !cliCtx.IsSet("total") && reqsTime > 0 {
 				reqs = 0
-				spec.Profile.Spec.Duration = reqsTime
+				specs[0].Duration = reqsTime
 			}
 
 			rgAffinity := cliCtx.GlobalString("rg-affinity")
@@ -163,10 +164,14 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 			}
 
 			if reqs != 0 {
-				spec.Profile.Spec.Total = reqs
+				specs[0].Total = reqs
 			}
 			spec.NodeAffinity = affinityLabels
-			spec.Profile.Spec.ContentType = types.ContentType(cliCtx.String("content-type"))
+			specs[0].ContentType = types.ContentType(cliCtx.String("content-type"))
+
+			// Update profile with modified specs
+			spec.Profile.SetFirstSpec(specs[0])
+
 			data, _ := yaml.Marshal(spec)
 
 			// Tweak the load profile for read-update case
@@ -202,7 +207,8 @@ func tweakReadUpdateProfile(cliCtx *cli.Context, spec *types.RunnerGroupSpec) er
 	configmapTotal := cliCtx.Int("read-update-configmap-total")
 
 	if namePattern != "" || ratio != 0 || namespace != "" || configmapTotal > 0 {
-		for _, r := range spec.Profile.Spec.Requests {
+		specs := spec.Profile.GetSpecs()
+		for _, r := range specs[0].Requests {
 			if r.Patch != nil {
 				if namePattern != "" {
 					r.Patch.Name = fmt.Sprintf("runkperf-cm-%s", namePattern)

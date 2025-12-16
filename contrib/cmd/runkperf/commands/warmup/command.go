@@ -102,8 +102,13 @@ var Command = cli.Command{
 					return fmt.Errorf("failed to parse %s affinity: %w", rgAffinity, err)
 				}
 
-				spec.Profile.Spec.Total = reqs
-				spec.Profile.Spec.Rate = rate
+				specs := spec.Profile.GetSpecs()
+				specs[0].Total = reqs
+				specs[0].Rate = rate
+
+				// Update profile with modified specs
+				spec.Profile.SetFirstSpec(specs[0])
+
 				spec.NodeAffinity = affinityLabels
 
 				data, _ := yaml.Marshal(spec)
