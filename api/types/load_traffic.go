@@ -6,7 +6,6 @@ package types
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -38,29 +37,8 @@ type LoadProfile struct {
 	Version int `json:"version" yaml:"version"`
 	// Description is a string value to describe this object.
 	Description string `json:"description,omitempty" yaml:"description"`
-	// Spec defines behavior of load profile (deprecated, use Specs for single or multiple specs).
-	Spec LoadProfileSpec `json:"spec,omitempty" yaml:"spec,omitempty"`
 	// Specs defines behaviors of load profile for time-series replay support.
-	Specs []LoadProfileSpec `json:"specs,omitempty" yaml:"specs,omitempty"`
-}
-
-// GetSpecs returns specs as a slice, handling both old and new format.
-// If Specs is set, returns it. Otherwise, returns Spec as a single-element slice.
-func (lp *LoadProfile) GetSpecs() []LoadProfileSpec {
-	if len(lp.Specs) > 0 {
-		return lp.Specs
-	}
-	// Fallback to old single Spec field
-	return []LoadProfileSpec{lp.Spec}
-}
-
-// SetFirstSpec updates the first spec, handling both old and new format.
-func (lp *LoadProfile) SetFirstSpec(spec LoadProfileSpec) {
-	if len(lp.Specs) > 0 {
-		lp.Specs[0] = spec
-	} else {
-		lp.Spec = spec
-	}
+	Specs []LoadProfileSpec `json:"specs" yaml:"specs"`
 }
 
 // LoadProfileSpec defines the load traffic for traget resource.
@@ -221,16 +199,15 @@ func (lp LoadProfile) Validate() error {
 		return fmt.Errorf("version should be 1")
 	}
 
-	// Validate that at least one format is provided
-	if len(lp.Specs) == 0 && reflect.DeepEqual(lp.Spec, LoadProfileSpec{}) {
-		return fmt.Errorf("either 'spec' or 'specs' must be provided")
+	// Validate that specs is provided
+	if len(lp.Specs) == 0 {
+		return fmt.Errorf("specs must be provided")
 	}
 
 	// Validate all specs
-	specs := lp.GetSpecs()
-	for i, spec := range specs {
+	for i, spec := range lp.Specs {
 		if err := spec.Validate(); err != nil {
-			return fmt.Errorf("spec[%d]: %w", i, err)
+			return fmt.Errorf("specs[%d]: %w", i, err)
 		}
 	}
 

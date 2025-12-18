@@ -3,51 +3,51 @@ count: 10
 loadProfile:
   version: 1
   description: "10nodes_1000pods"
-  spec:
-    rate: 10
-    conns: 10
-    client: 10
-    contentType: json
-    requests:
-    - staleList:
-        version: v1
-        resource: pods
-        namespace: job1pod1k
-      shares: 10
-    - staleGet:
-        version: v1
-        resource: pods
-        namespace: virtualnodes-kperf-io
-        name: node10job1pod1k-1
-      shares: 300
-    - staleList:
-        group: batch
-        version: v1
-        resource: jobs
-        namespace: job1pod1k
-      shares: 10
-    - staleGet:
-        group: batch
-        version: v1
-        resource: jobs
-        namespace: job1pod1k
-        name: batchjobs
-      shares: 300
-    - staleList: # cluster scope
-        version: v1
-        resource: nodes
-      shares: 10
-    - staleList: #cluster scope
-        version: v1
-        resource: namespaces
-      shares: 10
-    - staleGet: # cluster scope
-        version: v1
-        resource: nodes
-        name: node10job1pod1k-3
-      shares: 300
-    - staleGet: # cluster scope
-        version: v1
-        resource: namespaces
-        name: job1pod1k
-      shares: 300
+  specs:
+    - rate: 10
+      conns: 10
+      client: 10
+      contentType: json
+      requests:
+        - staleList:
+            version: v1
+            resource: pods
+            namespace: job1pod1k
+          shares: 10
+        - staleGet:
+            version: v1
+            resource: pods
+            namespace: virtualnodes-kperf-io
+            name: node10job1pod1k-1
+          shares: 300
+        - staleList:
+            group: batch
+            version: v1
+            resource: jobs
+            namespace: job1pod1k
+          shares: 10
+        - staleGet:
+            group: batch
+            version: v1
+            resource: jobs
+            namespace: job1pod1k
+            name: batchjobs
+          shares: 300
+        - staleList: # cluster scope
+            version: v1
+            resource: nodes
+          shares: 10
+        - staleList: #cluster scope
+            version: v1
+            resource: namespaces
+          shares: 10
+        - staleGet: # cluster scope
+            version: v1
+            resource: nodes
+            name: node10job1pod1k-3
+          shares: 300
+        - staleGet: # cluster scope
+            version: v1
+            resource: namespaces
+            name: job1pod1k
+          shares: 300

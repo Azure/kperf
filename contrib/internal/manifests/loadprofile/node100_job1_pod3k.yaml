@@ -2,26 +2,26 @@ count: 10
 loadProfile:
   version: 1
   description: "node100-job1-pod3k"
-  spec:
-    rate: 10
-    total: 36000
-    conns: 10
-    client: 100
-    contentType: json
-    disableHTTP2: false
-    maxRetries: 0
-    requests:
-      - staleList:
-          version: v1
-          resource: pods
-        shares: 1000 # chance 1000 / (1000 + 100 + 100)
-      - quorumList:
-          version: v1
-          resource: pods
-          limit: 1000
-        shares: 100 # chance 100 / (1000 + 100 + 100)
-      - quorumList:
-          version: v1
-          resource: events
-          limit: 1000
-        shares: 100 # chance 100 / (1000 + 100 + 100)
+  specs:
+    - rate: 10
+      total: 36000
+      conns: 10
+      client: 100
+      contentType: json
+      disableHTTP2: false
+      maxRetries: 0
+      requests:
+        - staleList:
+            version: v1
+            resource: pods
+          shares: 1000 # chance 1000 / (1000 + 100 + 100)
+        - quorumList:
+            version: v1
+            resource: pods
+            limit: 1000
+          shares: 100 # chance 100 / (1000 + 100 + 100)
+        - quorumList:
+            version: v1
+            resource: events
+            limit: 1000
+          shares: 100 # chance 100 / (1000 + 100 + 100)
