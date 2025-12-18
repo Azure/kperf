@@ -9,29 +9,29 @@ count: 10
 loadProfile:
   version: 1
   description: cilium list profile
-  spec:
-    rate: 20     # 20 req/sec * 10 runners = 200 req/sec
-    total: 12000 # run for ~10 minutes, 600 seconds * 20/sec = 12000
-    # 5k node cluster, one cilium agent per node
-    # divided by the number of runners.
-    conns: 500
-    client: 500
+  specs:
+    - rate: 20     # 20 req/sec * 10 runners = 200 req/sec
+      total: 12000 # run for ~10 minutes, 600 seconds * 20/sec = 12000
+      # 5k node cluster, one cilium agent per node
+      # divided by the number of runners.
+      conns: 500
+      client: 500
 
-    contentType: json
-    disableHTTP2: false
+      contentType: json
+      disableHTTP2: false
 
-    # 50/50 mix of ciliumidentity and ciliumendpoint queries.
-    # We're simulating with CilumEndpointSlice disabled here, on the assumption that CES will always
-    # have lower count than CEP, so if we can survive with CEP only then we're in good shape.
-    requests:
-      - staleList:
-          group: cilium.io
-          version: v2
-          resource: ciliumidentities
-        shares: 1000 # Has 50% chance = 1000 / (1000 + 1000)
-      - staleList:
-          group: cilium.io
-          version: v2
-          resource: ciliumendpoints
-          namespace: "default"
-        shares: 1000 # Has 50% chance = 1000 / (1000 + 1000)
+      # 50/50 mix of ciliumidentity and ciliumendpoint queries.
+      # We're simulating with CilumEndpointSlice disabled here, on the assumption that CES will always
+      # have lower count than CEP, so if we can survive with CEP only then we're in good shape.
+      requests:
+        - staleList:
+            group: cilium.io
+            version: v2
+            resource: ciliumidentities
+          shares: 1000 # Has 50% chance = 1000 / (1000 + 1000)
+        - staleList:
+            group: cilium.io
+            version: v2
+            resource: ciliumendpoints
+            namespace: "default"
+          shares: 1000 # Has 50% chance = 1000 / (1000 + 1000)
