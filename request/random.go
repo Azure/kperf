@@ -61,7 +61,7 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 		case r.GetPodLog != nil:
 			builder = newRequestGetPodLogBuilder(r.GetPodLog, spec.MaxRetries)
 		case r.Patch != nil:
-			builder = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
+			builder = newRequestPatchBuilder(r.Patch, spec.MaxRetries)
 		case r.PostDel != nil:
 			builder = newRequestPostDelBuilder(r.PostDel, "", spec.MaxRetries)
 		default:
@@ -363,33 +363,25 @@ func (b *requestGetPodLogBuilder) Build(cli rest.Interface) Requester {
 }
 
 type requestPatchBuilder struct {
-	version         schema.GroupVersion
-	resource        string
-	resourceVersion string
-	namespace       string
-	name            string
-	keySpaceSize    int
-	patchType       apitypes.PatchType
-	body            interface{}
-	maxRetries      int
+	version      schema.GroupVersion
+	resource     string
+	namespace    string
+	name         string
+	keySpaceSize int
+	maxRetries   int
 }
 
-func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) *requestPatchBuilder {
-	patchType, _ := types.GetPatchType(src.PatchType)
-
+func newRequestPatchBuilder(src *types.RequestPatch, maxRetries int) *requestPatchBuilder {
 	return &requestPatchBuilder{
 		version: schema.GroupVersion{
 			Group:   src.Group,
 			Version: src.Version,
 		},
-		resource:        src.Resource,
-		resourceVersion: resourceVersion,
-		namespace:       src.Namespace,
-		name:            src.Name,
-		keySpaceSize:    src.KeySpaceSize,
-		patchType:       patchType,
-		body:            []byte(src.Body),
-		maxRetries:      maxRetries,
+		resource:     src.Resource,
+		namespace:    src.Namespace,
+		name:         src.Name,
+		keySpaceSize: src.KeySpaceSize,
+		maxRetries:   maxRetries,
 	}
 }
 
@@ -413,11 +405,13 @@ func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
 	finalName := fmt.Sprintf("%s-%d", b.name, suffix)
 	comps = append(comps, b.resource, finalName)
 
+	body := fmt.Sprintf(`{"metadata":{"annotations":{"force-update":"%d-%d"}}}`, suffix, time.Now().UnixNano())
+
 	return &DiscardRequester{
 		BaseRequester: BaseRequester{
 			method: "PATCH",
-			req: cli.Patch(b.patchType).AbsPath(comps...).
-				Body(b.body).
+			req: cli.Patch(apitypes.MergePatchType).AbsPath(comps...).
+				Body([]byte(body)).
 				MaxRetries(b.maxRetries),
 		},
 	}
