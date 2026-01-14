@@ -2,33 +2,33 @@ count: 10
 loadProfile:
   version: 1
   description: "read_update"
-  spec:
-    rate: 10
-    total: 3000
-    conns: 10
-    client: 10
-    contentType: json
-    disableHTTP2: false
-    maxRetries: 0
-    requests:
-      - staleList:
-          version: v1
-          resource: configmaps
-          namespace: default
-        shares: 50
-      - patch:
-          version: v1
-          resource: configmaps
-          namespace: default
-          patchType: merge
-          name: runkperf-cm-kperf-read-update
-          keySpaceSize: 100
-          body: |
-            {
-              "metadata": {
-                "labels": {
-                  "test-label": "mutation-test"
+  specs:
+    - rate: 10
+      total: 3000
+      conns: 10
+      client: 10
+      contentType: json
+      disableHTTP2: false
+      maxRetries: 0
+      requests:
+        - staleList:
+            version: v1
+            resource: configmaps
+            namespace: default
+          shares: 50
+        - patch:
+            version: v1
+            resource: configmaps
+            namespace: default
+            patchType: merge
+            name: runkperf-cm-kperf-read-update
+            keySpaceSize: 100
+            body: |
+              {
+                "metadata": {
+                  "labels": {
+                    "test-label": "mutation-test"
+                  }
                 }
               }
-            }
-        shares: 50
+          shares: 50

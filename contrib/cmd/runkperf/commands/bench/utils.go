@@ -153,7 +153,7 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 			reqsTime := cliCtx.Int("duration")
 			if !cliCtx.IsSet("total") && reqsTime > 0 {
 				reqs = 0
-				spec.Profile.Spec.Duration = reqsTime
+				spec.Profile.Specs[0].Duration = reqsTime
 			}
 
 			rgAffinity := cliCtx.GlobalString("rg-affinity")
@@ -163,10 +163,11 @@ func newLoadProfileFromEmbed(cliCtx *cli.Context, name string) (_name string, _s
 			}
 
 			if reqs != 0 {
-				spec.Profile.Spec.Total = reqs
+				spec.Profile.Specs[0].Total = reqs
 			}
 			spec.NodeAffinity = affinityLabels
-			spec.Profile.Spec.ContentType = types.ContentType(cliCtx.String("content-type"))
+			spec.Profile.Specs[0].ContentType = types.ContentType(cliCtx.String("content-type"))
+
 			data, _ := yaml.Marshal(spec)
 
 			// Tweak the load profile for read-update case
@@ -202,7 +203,7 @@ func tweakReadUpdateProfile(cliCtx *cli.Context, spec *types.RunnerGroupSpec) er
 	configmapTotal := cliCtx.Int("read-update-configmap-total")
 
 	if namePattern != "" || ratio != 0 || namespace != "" || configmapTotal > 0 {
-		for _, r := range spec.Profile.Spec.Requests {
+		for _, r := range spec.Profile.Specs[0].Requests {
 			if r.Patch != nil {
 				if namePattern != "" {
 					r.Patch.Name = fmt.Sprintf("runkperf-cm-%s", namePattern)
