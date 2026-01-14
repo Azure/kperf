@@ -72,13 +72,13 @@ func ApplyPriorityLevelConfiguration(kubeconfigPath string) error {
 	// Load the kubeconfig file
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfigPath)
 	if err != nil {
-		return fmt.Errorf("failed to load kubeconfig: %v", err)
+		return fmt.Errorf("failed to load kubeconfig: %w", err)
 	}
 
 	// Create a Kubernetes client
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return fmt.Errorf("failed to create Kubernetes client: %v", err)
+		return fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
 	// Define the PriorityLevelConfiguration
@@ -117,7 +117,7 @@ func ApplyPriorityLevelConfiguration(kubeconfigPath string) error {
 		}
 	}
 	if err != nil {
-		return fmt.Errorf("failed to apply PriorityLevelConfiguration: %v", err)
+		return fmt.Errorf("failed to apply PriorityLevelConfiguration: %w", err)
 	}
 
 	fmt.Printf("Successfully applied PriorityLevelConfiguration: %s\n", plc.Name)
