@@ -103,19 +103,25 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		clientNum := profileCfg.Specs[0].Conns
+		// Runner only supports single spec
+		if len(profileCfg.Specs) > 1 {
+			return fmt.Errorf("runner only supports single spec, but got %d specs", len(profileCfg.Specs))
+		}
+		pspec := profileCfg.Specs[0]
+
+		clientNum := pspec.Conns
 		restClis, err := request.NewClients(kubeCfgPath,
 			clientNum,
 			request.WithClientUserAgentOpt(cliCtx.String("user-agent")),
-			request.WithClientQPSOpt(profileCfg.Specs[0].Rate),
-			request.WithClientContentTypeOpt(profileCfg.Specs[0].ContentType),
-			request.WithClientDisableHTTP2Opt(profileCfg.Specs[0].DisableHTTP2),
+			request.WithClientQPSOpt(pspec.Rate),
+			request.WithClientContentTypeOpt(pspec.ContentType),
+			request.WithClientDisableHTTP2Opt(pspec.DisableHTTP2),
 		)
 		if err != nil {
 			return err
 		}
 
-		stats, err := request.Schedule(context.TODO(), &profileCfg.Specs[0], restClis)
+		stats, err := request.Schedule(context.TODO(), &pspec, restClis)
 		if err != nil {
 			return err
 		}
