@@ -6,6 +6,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"fmt"
 	"os"
@@ -15,6 +16,7 @@ import (
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/metrics"
 	"github.com/Azure/kperf/request"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 
 	"github.com/urfave/cli"
@@ -103,25 +105,21 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		// Runner only supports single spec
-		if len(profileCfg.Specs) > 1 {
-			return fmt.Errorf("runner only supports single spec, but got %d specs", len(profileCfg.Specs))
+		// Check for multi-spec CLI override conflict
+		if len(profileCfg.Specs) > 1 && hasCliOverrides(cliCtx) {
+			return fmt.Errorf("CLI flag overrides are not allowed when config has multiple specs")
 		}
-		pspec := profileCfg.Specs[0]
 
-		clientNum := pspec.Conns
+		// Use first spec for client configuration (all specs share same client pool)
+		firstSpec := profileCfg.Specs[0]
+		clientNum := firstSpec.Conns
 		restClis, err := request.NewClients(kubeCfgPath,
 			clientNum,
 			request.WithClientUserAgentOpt(cliCtx.String("user-agent")),
-			request.WithClientQPSOpt(pspec.Rate),
-			request.WithClientContentTypeOpt(pspec.ContentType),
-			request.WithClientDisableHTTP2Opt(pspec.DisableHTTP2),
+			request.WithClientQPSOpt(firstSpec.Rate),
+			request.WithClientContentTypeOpt(firstSpec.ContentType),
+			request.WithClientDisableHTTP2Opt(firstSpec.DisableHTTP2),
 		)
-		if err != nil {
-			return err
-		}
-
-		stats, err := request.Schedule(context.TODO(), &pspec, restClis)
 		if err != nil {
 			return err
 		}
@@ -147,7 +145,14 @@ var runCommand = cli.Command{
 		}
 
 		rawDataFlagIncluded := cliCtx.Bool("raw-data")
-		err = printResponseStats(f, rawDataFlagIncluded, stats)
+
+		// Execute all specs (handles both single and multiple specs uniformly)
+		perSpecResults, aggregated, err := executeSpecs(context.TODO(), profileCfg.Specs, restClis)
+		if err != nil {
+			return err
+		}
+
+		err = printMultiSpecResults(f, rawDataFlagIncluded, perSpecResults, aggregated)
 		if err != nil {
 			return fmt.Errorf("error while printing response stats: %w", err)
 		}
@@ -211,14 +216,111 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 	return &profileCfg, nil
 }
 
-// printResponseStats prints types.RunnerMetricReport into underlying file.
-func printResponseStats(f *os.File, rawDataFlagIncluded bool, stats *request.Result) error {
+// hasCliOverrides checks if any CLI override flags are set.
+func hasCliOverrides(cliCtx *cli.Context) bool {
+	overrideFlags := []string{"rate", "conns", "client", "total", "duration",
+		"content-type", "disable-http2", "max-retries"}
+	for _, flag := range overrideFlags {
+		if cliCtx.IsSet(flag) {
+			return true
+		}
+	}
+	return false
+}
+
+// executeSpecs runs all specs sequentially and returns per-spec + aggregated results.
+func executeSpecs(ctx context.Context, specs []types.LoadProfileSpec, restClis []rest.Interface) ([]*request.Result, *request.Result, error) {
+	if len(specs) == 0 {
+		return nil, nil, fmt.Errorf("no specs to execute")
+	}
+
+	results := make([]*request.Result, 0, len(specs))
+	totalDuration := time.Duration(0)
+
+	for i, spec := range specs {
+		klog.V(2).Infof("Executing spec %d/%d", i+1, len(specs))
+
+		result, err := request.Schedule(ctx, &spec, restClis)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to execute spec %d: %w", i+1, err)
+		}
+
+		results = append(results, result)
+		totalDuration += result.Duration
+	}
+
+	aggregated := aggregateResults(results)
+	aggregated.Duration = totalDuration
+
+	return results, aggregated, nil
+}
+
+// aggregateResults combines multiple results into single aggregated result.
+func aggregateResults(results []*request.Result) *request.Result {
+	aggregated := &request.Result{
+		ResponseStats: types.ResponseStats{
+			Errors:             make([]types.ResponseError, 0),
+			LatenciesByURL:     make(map[string][]float64),
+			TotalReceivedBytes: 0,
+		},
+		Total: 0,
+	}
+
+	for _, result := range results {
+		// Aggregate errors
+		aggregated.Errors = append(aggregated.Errors, result.Errors...)
+
+		// Aggregate latencies by URL
+		for url, latencies := range result.LatenciesByURL {
+			if _, exists := aggregated.LatenciesByURL[url]; !exists {
+				aggregated.LatenciesByURL[url] = make([]float64, 0)
+			}
+			aggregated.LatenciesByURL[url] = append(aggregated.LatenciesByURL[url], latencies...)
+		}
+
+		// Sum bytes and requests
+		aggregated.TotalReceivedBytes += result.TotalReceivedBytes
+		aggregated.Total += result.Total
+	}
+
+	return aggregated
+}
+
+// printMultiSpecResults prints results for multiple specs with aggregated summary.
+func printMultiSpecResults(f *os.File, rawDataFlagIncluded bool, perSpecResults []*request.Result, aggregated *request.Result) error {
+	// Build per-spec reports
+	perSpecReports := make([]types.RunnerMetricReport, 0, len(perSpecResults))
+	for _, result := range perSpecResults {
+		report := buildRunnerMetricReport(result, rawDataFlagIncluded)
+		perSpecReports = append(perSpecReports, report)
+	}
+
+	// Build aggregated report
+	aggregatedReport := buildRunnerMetricReport(aggregated, rawDataFlagIncluded)
+
+	// Create multi-spec report
+	multiReport := types.MultiSpecRunnerMetricReport{
+		PerSpecResults: perSpecReports,
+		Aggregated:     aggregatedReport,
+	}
+
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "  ")
+
+	err := encoder.Encode(multiReport)
+	if err != nil {
+		return fmt.Errorf("failed to encode json: %w", err)
+	}
+	return nil
+}
+
+// buildRunnerMetricReport builds a RunnerMetricReport from request.Result.
+func buildRunnerMetricReport(stats *request.Result, includeRawData bool) types.RunnerMetricReport {
 	output := types.RunnerMetricReport{
 		Total:              stats.Total,
 		ErrorStats:         metrics.BuildErrorStatsGroupByType(stats.Errors),
 		Duration:           stats.Duration.String(),
 		TotalReceivedBytes: stats.TotalReceivedBytes,
-
 		PercentileLatenciesByURL: map[string][][2]float64{},
 	}
 
@@ -236,17 +338,10 @@ func printResponseStats(f *os.File, rawDataFlagIncluded bool, stats *request.Res
 		output.PercentileLatenciesByURL[u] = metrics.BuildPercentileLatencies(l)
 	}
 
-	if rawDataFlagIncluded {
+	if includeRawData {
 		output.LatenciesByURL = stats.LatenciesByURL
 		output.Errors = stats.Errors
 	}
 
-	encoder := json.NewEncoder(f)
-	encoder.SetIndent("", "  ")
-
-	err := encoder.Encode(output)
-	if err != nil {
-		return fmt.Errorf("failed to encode json: %w", err)
-	}
-	return nil
+	return output
 }

@@ -1,0 +1,61 @@
+count: 10
+loadProfile:
+  version: 1
+  description: "time-series replay - simulating traffic spike pattern"
+  specs:
+    # Phase 1: Baseline load (30 seconds)
+    - rate: 10
+      duration: 30
+      conns: 5
+      client: 10
+      contentType: json
+      disableHTTP2: false
+      maxRetries: 0
+      requests:
+        - staleList:
+            version: v1
+            resource: pods
+          shares: 70
+        - quorumList:
+            version: v1
+            resource: pods
+            limit: 100
+          shares: 30
+
+    # Phase 2: Traffic spike (20 seconds)
+    - rate: 100
+      duration: 20
+      conns: 20
+      client: 50
+      contentType: json
+      disableHTTP2: false
+      maxRetries: 0
+      requests:
+        - staleList:
+            version: v1
+            resource: pods
+          shares: 60
+        - quorumList:
+            version: v1
+            resource: pods
+            limit: 100
+          shares: 40
+
+    # Phase 3: Recovery period (30 seconds)
+    - rate: 25
+      duration: 30
+      conns: 10
+      client: 20
+      contentType: json
+      disableHTTP2: false
+      maxRetries: 0
+      requests:
+        - staleList:
+            version: v1
+            resource: pods
+          shares: 80
+        - quorumList:
+            version: v1
+            resource: pods
+            limit: 100
+          shares: 20
