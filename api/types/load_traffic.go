@@ -4,11 +4,7 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
-	"strings"
-
-	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
 // ContentType represents the format of response.
@@ -165,10 +161,6 @@ type RequestPatch struct {
 	Name string `json:"name" yaml:"name"`
 	// KeySpaceSize is used to generate random number as name's suffix.
 	KeySpaceSize int `json:"keySpaceSize" yaml:"keySpaceSize"`
-	// PatchType is the type of patch, e.g. "json", "merge", "strategic-merge".
-	PatchType string `json:"patchType" yaml:"patchType"`
-	// Body is the request body, for fields to be changed.
-	Body string `json:"body" yaml:"body"`
 }
 
 // RequestGetPodLog defines GetLog request for target pod.
@@ -339,21 +331,6 @@ func (m *KubeGroupVersionResource) Validate() error {
 	return nil
 }
 
-// GetPatchType returns the Kubernetes PatchType for a given patch type string.
-// Returns the PatchType and an error if the patch type is invalid.
-func GetPatchType(patchType string) (apitypes.PatchType, bool) {
-	switch patchType {
-	case "json":
-		return apitypes.JSONPatchType, true
-	case "merge":
-		return apitypes.MergePatchType, true
-	case "strategic-merge":
-		return apitypes.StrategicMergePatchType, true
-	default:
-		return "", false
-	}
-}
-
 // Validate validates RequestPatch type.
 func (r *RequestPatch) Validate() error {
 	if err := r.KubeGroupVersionResource.Validate(); err != nil {
@@ -362,24 +339,9 @@ func (r *RequestPatch) Validate() error {
 	if r.Name == "" {
 		return fmt.Errorf("name is required")
 	}
-	if r.Body == "" {
-		return fmt.Errorf("body is required")
+	if r.Resource == "" {
+		return fmt.Errorf("resource is required")
 	}
-
-	// Validate patch type
-	_, ok := GetPatchType(r.PatchType)
-	if !ok {
-		return fmt.Errorf("unknown patch type: %s (valid types: json, merge, strategic-merge)", r.PatchType)
-	}
-
-	// Validate JSON body and trim it
-	trimmed := strings.TrimSpace(r.Body)
-	if !json.Valid([]byte(trimmed)) {
-		return fmt.Errorf("invalid JSON in patch body: %q", r.Body)
-	}
-
-	r.Body = trimmed // Store the trimmed body
-
 	return nil
 }
 
