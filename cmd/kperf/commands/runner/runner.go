@@ -103,19 +103,25 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		clientNum := profileCfg.Spec.Conns
+		// Runner only supports single spec
+		if len(profileCfg.Specs) > 1 {
+			return fmt.Errorf("runner only supports single spec, but got %d specs", len(profileCfg.Specs))
+		}
+		pspec := profileCfg.Specs[0]
+
+		clientNum := pspec.Conns
 		restClis, err := request.NewClients(kubeCfgPath,
 			clientNum,
 			request.WithClientUserAgentOpt(cliCtx.String("user-agent")),
-			request.WithClientQPSOpt(profileCfg.Spec.Rate),
-			request.WithClientContentTypeOpt(profileCfg.Spec.ContentType),
-			request.WithClientDisableHTTP2Opt(profileCfg.Spec.DisableHTTP2),
+			request.WithClientQPSOpt(pspec.Rate),
+			request.WithClientContentTypeOpt(pspec.ContentType),
+			request.WithClientDisableHTTP2Opt(pspec.DisableHTTP2),
 		)
 		if err != nil {
 			return err
 		}
 
-		stats, err := request.Schedule(context.TODO(), &profileCfg.Spec, restClis)
+		stats, err := request.Schedule(context.TODO(), &pspec, restClis)
 		if err != nil {
 			return err
 		}
@@ -167,36 +173,36 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 
 	// override value by flags
 	if v := "rate"; cliCtx.IsSet(v) {
-		profileCfg.Spec.Rate = cliCtx.Float64(v)
+		profileCfg.Specs[0].Rate = cliCtx.Float64(v)
 	}
-	if v := "conns"; cliCtx.IsSet(v) || profileCfg.Spec.Conns == 0 {
-		profileCfg.Spec.Conns = cliCtx.Int(v)
+	if v := "conns"; cliCtx.IsSet(v) || profileCfg.Specs[0].Conns == 0 {
+		profileCfg.Specs[0].Conns = cliCtx.Int(v)
 	}
-	if v := "client"; cliCtx.IsSet(v) || profileCfg.Spec.Client == 0 {
-		profileCfg.Spec.Client = cliCtx.Int(v)
+	if v := "client"; cliCtx.IsSet(v) || profileCfg.Specs[0].Client == 0 {
+		profileCfg.Specs[0].Client = cliCtx.Int(v)
 	}
 	if v := "total"; cliCtx.IsSet(v) {
-		profileCfg.Spec.Total = cliCtx.Int(v)
+		profileCfg.Specs[0].Total = cliCtx.Int(v)
 	}
 	if v := "duration"; cliCtx.IsSet(v) {
-		profileCfg.Spec.Duration = cliCtx.Int(v)
+		profileCfg.Specs[0].Duration = cliCtx.Int(v)
 	}
-	if profileCfg.Spec.Total > 0 && profileCfg.Spec.Duration > 0 {
-		klog.Warningf("both total:%v and duration:%v are set, duration will be ignored\n", profileCfg.Spec.Total, profileCfg.Spec.Duration)
-		profileCfg.Spec.Duration = 0
+	if profileCfg.Specs[0].Total > 0 && profileCfg.Specs[0].Duration > 0 {
+		klog.Warningf("both total:%v and duration:%v are set, duration will be ignored\n", profileCfg.Specs[0].Total, profileCfg.Specs[0].Duration)
+		profileCfg.Specs[0].Duration = 0
 	}
-	if profileCfg.Spec.Total == 0 && profileCfg.Spec.Duration == 0 {
+	if profileCfg.Specs[0].Total == 0 && profileCfg.Specs[0].Duration == 0 {
 		// Use default total value
-		profileCfg.Spec.Total = cliCtx.Int("total")
+		profileCfg.Specs[0].Total = cliCtx.Int("total")
 	}
-	if v := "content-type"; cliCtx.IsSet(v) || profileCfg.Spec.ContentType == "" {
-		profileCfg.Spec.ContentType = types.ContentType(cliCtx.String(v))
+	if v := "content-type"; cliCtx.IsSet(v) || profileCfg.Specs[0].ContentType == "" {
+		profileCfg.Specs[0].ContentType = types.ContentType(cliCtx.String(v))
 	}
 	if v := "disable-http2"; cliCtx.IsSet(v) {
-		profileCfg.Spec.DisableHTTP2 = cliCtx.Bool(v)
+		profileCfg.Specs[0].DisableHTTP2 = cliCtx.Bool(v)
 	}
 	if v := "max-retries"; cliCtx.IsSet(v) {
-		profileCfg.Spec.MaxRetries = cliCtx.Int(v)
+		profileCfg.Specs[0].MaxRetries = cliCtx.Int(v)
 	}
 
 	if err := profileCfg.Validate(); err != nil {

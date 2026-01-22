@@ -37,8 +37,8 @@ type LoadProfile struct {
 	Version int `json:"version" yaml:"version"`
 	// Description is a string value to describe this object.
 	Description string `json:"description,omitempty" yaml:"description"`
-	// Spec defines behavior of load profile.
-	Spec LoadProfileSpec `json:"spec" yaml:"spec"`
+	// Specs defines behaviors of load profile for time-series replay support.
+	Specs []LoadProfileSpec `json:"specs" yaml:"specs"`
 }
 
 // LoadProfileSpec defines the load traffic for traget resource.
@@ -198,7 +198,20 @@ func (lp LoadProfile) Validate() error {
 	if lp.Version != 1 {
 		return fmt.Errorf("version should be 1")
 	}
-	return lp.Spec.Validate()
+
+	// Validate that specs is provided
+	if len(lp.Specs) == 0 {
+		return fmt.Errorf("specs must be provided")
+	}
+
+	// Validate all specs
+	for i, spec := range lp.Specs {
+		if err := spec.Validate(); err != nil {
+			return fmt.Errorf("specs[%d]: %w", i, err)
+		}
+	}
+
+	return nil
 }
 
 // Validate verifies fields of LoadProfileSpec.
