@@ -68,6 +68,14 @@ type RunnerMetricReport struct {
 	PercentileLatenciesByURL map[string][][2]float64 `json:"percentileLatenciesByURL,omitempty"`
 }
 
+// MultiSpecRunnerMetricReport contains results for multiple specs with aggregated summary.
+type MultiSpecRunnerMetricReport struct {
+	// PerSpecResults contains individual results for each spec.
+	PerSpecResults []RunnerMetricReport `json:"perSpecResults,omitempty"`
+	// Aggregated contains summed/aggregated result across all specs.
+	Aggregated RunnerMetricReport `json:"aggregated"`
+}
+
 // TODO(weifu): build brand new struct for RunnerGroupsReport to include more
 // information, like how many runner groups, service account and flow control.
 type RunnerGroupsReport = RunnerMetricReport

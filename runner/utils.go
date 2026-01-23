@@ -83,12 +83,22 @@ func buildRunnerGroupSummary(s *localstore.Store, groups []*group.Handler) *type
 				continue
 			}
 
-			report := types.RunnerMetricReport{}
+			var report types.RunnerMetricReport
 
-			err = json.Unmarshal(data, &report)
-			if err != nil {
-				klog.V(2).ErrorS(err, "failed to unmarshal", "runner", pod.Name)
-				continue
+			// Try to unmarshal as MultiSpecRunnerMetricReport first
+			multiReport := types.MultiSpecRunnerMetricReport{}
+			err = json.Unmarshal(data, &multiReport)
+			if err == nil && len(multiReport.PerSpecResults) > 0 {
+				// Multi-spec format - use aggregated field
+				report = multiReport.Aggregated
+			} else {
+				// Single-spec format or unmarshal error - try as RunnerMetricReport
+				report = types.RunnerMetricReport{}
+				err = json.Unmarshal(data, &report)
+				if err != nil {
+					klog.V(2).ErrorS(err, "failed to unmarshal", "runner", pod.Name)
+					continue
+				}
 			}
 
 			// update totalReceivedBytes
