@@ -317,10 +317,10 @@ func printMultiSpecResults(f *os.File, rawDataFlagIncluded bool, perSpecResults 
 // buildRunnerMetricReport builds a RunnerMetricReport from request.Result.
 func buildRunnerMetricReport(stats *request.Result, includeRawData bool) types.RunnerMetricReport {
 	output := types.RunnerMetricReport{
-		Total:              stats.Total,
-		ErrorStats:         metrics.BuildErrorStatsGroupByType(stats.Errors),
-		Duration:           stats.Duration.String(),
-		TotalReceivedBytes: stats.TotalReceivedBytes,
+		Total:                    stats.Total,
+		ErrorStats:               metrics.BuildErrorStatsGroupByType(stats.Errors),
+		Duration:                 stats.Duration.String(),
+		TotalReceivedBytes:       stats.TotalReceivedBytes,
 		PercentileLatenciesByURL: map[string][][2]float64{},
 	}
 
