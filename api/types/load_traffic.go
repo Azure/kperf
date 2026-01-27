@@ -109,6 +109,8 @@ type RequestGet struct {
 	Namespace string `json:"namespace" yaml:"namespace"`
 	// Name is object's name.
 	Name string `json:"name" yaml:"name"`
+	// KeySpaceSize is used to generate random number as name's suffix.
+	KeySpaceSize int `json:"keySpaceSize" yaml:"keySpaceSize"`
 }
 
 // RequestList defines LIST request for target objects.
