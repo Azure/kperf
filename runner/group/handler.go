@@ -383,8 +383,9 @@ func (h *Handler) buildBatchJobObject(uploadURL string) *batchv1.Job {
 		Affinity: &corev1.Affinity{},
 		Containers: []corev1.Container{
 			{
-				Name:  "runner",
-				Image: h.imageRef,
+				Name:            "runner",
+				Image:           h.imageRef,
+				ImagePullPolicy: corev1.PullAlways,
 				Env: []corev1.EnvVar{
 					{
 						Name: "POD_NAME",
