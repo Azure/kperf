@@ -46,9 +46,9 @@ func (r ReplayRequest) Validate() error {
 		return fmt.Errorf("apiPath is required")
 	}
 
-	// Name is required for specific operations (GET, DELETE, PATCH)
-	// CREATE, LIST, WATCH, DELETECOLLECTION, APPLY can have empty names
-	if (r.Verb == "GET" || r.Verb == "DELETE" || r.Verb == "PATCH") && r.Name == "" {
+	// Name is required for operations targeting a specific object
+	// CREATE, LIST, WATCH, DELETECOLLECTION can have empty names
+	if (r.Verb == "GET" || r.Verb == "DELETE" || r.Verb == "PATCH" || r.Verb == "APPLY") && r.Name == "" {
 		return fmt.Errorf("name is required for %s operation", r.Verb)
 	}
 

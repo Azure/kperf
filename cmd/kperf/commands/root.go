@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/Azure/kperf/cmd/kperf/commands/replay"
 	"github.com/Azure/kperf/cmd/kperf/commands/runner"
 	"github.com/Azure/kperf/cmd/kperf/commands/runnergroup"
 	"github.com/Azure/kperf/cmd/kperf/commands/virtualcluster"
@@ -26,6 +27,7 @@ func App() *cli.App {
 			runner.Command,
 			runnergroup.Command,
 			virtualcluster.Command,
+			replay.Command,
 		},
 		Flags: []cli.Flag{
 			cli.StringFlag{

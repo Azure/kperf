@@ -15,6 +15,7 @@ import (
 	"github.com/Azure/kperf/api/types"
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/metrics"
+	"github.com/Azure/kperf/replay"
 	"github.com/Azure/kperf/request"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
@@ -29,6 +30,7 @@ var Command = cli.Command{
 	Usage: "Setup benchmark to kube-apiserver from one endpoint",
 	Subcommands: []cli.Command{
 		runCommand,
+		replayCommand,
 	},
 }
 
@@ -331,4 +333,108 @@ func buildRunnerMetricReport(stats *request.Result, includeRawData bool) types.R
 	metrics.BuildPercentileLatenciesReport(&output, stats.LatenciesByURL, includeRawData, stats.Errors)
 
 	return output
+}
+
+var replayCommand = cli.Command{
+	Name:  "replay",
+	Usage: "Run a replay test (for distributed mode - used by runner pods)",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "kubeconfig",
+			Usage: "Path to the kubeconfig file",
+			Value: utils.DefaultKubeConfigPath,
+		},
+		cli.StringFlag{
+			Name:     "config",
+			Usage:    "Path or URL to the replay profile (supports .yaml.gz)",
+			Required: true,
+		},
+		cli.IntFlag{
+			Name:  "runner-index",
+			Usage: "Runner index (0-based). If not set, reads from JOB_COMPLETION_INDEX env var",
+			Value: -1,
+		},
+		cli.StringFlag{
+			Name:  "result",
+			Usage: "Path to the file which stores results",
+		},
+		cli.BoolFlag{
+			Name:  "raw-data",
+			Usage: "Include raw latency data in result",
+		},
+	},
+	Action: func(cliCtx *cli.Context) error {
+		kubeCfgPath := cliCtx.String("kubeconfig")
+		configPath := cliCtx.String("config")
+
+		// Load the replay profile
+		profile, err := replay.LoadProfile(context.Background(), configPath)
+		if err != nil {
+			return fmt.Errorf("failed to load replay profile: %w", err)
+		}
+
+		// Determine runner index
+		runnerIndex := cliCtx.Int("runner-index")
+		if runnerIndex < 0 {
+			runnerIndex = replay.GetRunnerIndex(0)
+		}
+
+		klog.V(2).InfoS("Starting replay runner",
+			"runnerIndex", runnerIndex,
+			"runnerCount", profile.Spec.RunnerCount,
+			"totalRequests", len(profile.Requests),
+		)
+
+		// Run the single runner
+		result, err := replay.ScheduleSingleRunner(context.Background(), kubeCfgPath, profile, runnerIndex)
+		if err != nil {
+			return fmt.Errorf("failed to run replay: %w", err)
+		}
+
+		// Write result
+		var f *os.File = os.Stdout
+		outputFilePath := cliCtx.String("result")
+		if outputFilePath != "" {
+			outputFileDir := filepath.Dir(outputFilePath)
+			if _, err := os.Stat(outputFileDir); os.IsNotExist(err) {
+				if err := os.MkdirAll(outputFileDir, 0750); err != nil {
+					return fmt.Errorf("failed to create output directory: %w", err)
+				}
+			}
+
+			f, err = os.Create(outputFilePath)
+			if err != nil {
+				return fmt.Errorf("failed to create result file: %w", err)
+			}
+			defer f.Close()
+		}
+
+		rawDataFlagIncluded := cliCtx.Bool("raw-data")
+
+		// Build report using existing metrics infrastructure
+		report := buildReplayRunnerReport(result, rawDataFlagIncluded, runnerIndex)
+
+		encoder := json.NewEncoder(f)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(report); err != nil {
+			return fmt.Errorf("failed to encode result: %w", err)
+		}
+
+		return nil
+	},
+}
+
+// buildReplayRunnerReport builds a RunnerMetricReport from replay.RunnerResult.
+func buildReplayRunnerReport(result *replay.RunnerResult, includeRawData bool, runnerIndex int) types.RunnerMetricReport {
+	report := types.RunnerMetricReport{
+		Total:                    result.Total,
+		Duration:                 result.Duration.String(),
+		ErrorStats:               metrics.BuildErrorStatsGroupByType(result.ResponseStats.Errors),
+		TotalReceivedBytes:       result.ResponseStats.TotalReceivedBytes,
+		PercentileLatenciesByURL: map[string][][2]float64{},
+	}
+
+	metrics.BuildPercentileLatenciesReport(&report, result.ResponseStats.LatenciesByURL, includeRawData, result.ResponseStats.Errors)
+
+	return report
 }

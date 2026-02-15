@@ -112,6 +112,17 @@ func TestReplayRequestValidate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "missing name for APPLY",
+			req: ReplayRequest{
+				Timestamp:    0,
+				Verb:         "APPLY",
+				ResourceKind: "Pod",
+				APIPath:      "/api/v1/pods",
+				Body:         `{"apiVersion":"v1","kind":"Pod"}`,
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
