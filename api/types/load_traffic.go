@@ -41,7 +41,7 @@ type LoadProfile struct {
 	Specs []LoadProfileSpec `json:"specs" yaml:"specs"`
 }
 
-// LoadProfileSpec defines the load traffic for traget resource.
+// LoadProfileSpec defines the load traffic for target resource.
 type LoadProfileSpec struct {
 	// Rate defines the maximum requests per second (zero is no limit).
 	Rate float64 `json:"rate" yaml:"rate"`

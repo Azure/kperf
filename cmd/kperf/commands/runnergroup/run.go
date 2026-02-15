@@ -76,7 +76,10 @@ var runCommand = cli.Command{
 			return fmt.Errorf("only support one runner group right now. will support it after https://github.com/Azure/kperf/issues/25")
 		}
 
-		specs[0].NodeAffinity = affinityLabels
+		// Only override nodeAffinity if CLI flag is provided
+		if len(affinityLabels) > 0 {
+			specs[0].NodeAffinity = affinityLabels
+		}
 
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 		return runner.CreateRunnerGroupServer(context.Background(),
