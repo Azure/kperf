@@ -89,7 +89,7 @@ var runCommand = cli.Command{
 		},
 		cli.BoolFlag{
 			Name:  "raw-data",
-			Usage: "show raw letencies data in result",
+			Usage: "show raw latencies data in result",
 		},
 		cli.IntFlag{
 			Name:  "duration",
@@ -174,6 +174,10 @@ func loadConfig(cliCtx *cli.Context) (*types.LoadProfile, error) {
 
 	if err := yaml.Unmarshal(cfgInRaw, &profileCfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal %s from yaml format: %w", cfgPath, err)
+	}
+
+	if len(profileCfg.Specs) == 0 {
+		return nil, fmt.Errorf("specs must be provided in config file %s", cfgPath)
 	}
 
 	// override value by flags
