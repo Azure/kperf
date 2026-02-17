@@ -1,0 +1,18 @@
+# Sample RunnerGroupSpec for replay mode
+#
+# Usage:
+#   kperf rg run --runnergroup=file://testdata/sample_replay_runnergroup.yaml --runner-image=<image>
+#
+# For URL-based profile loading (recommended for large files):
+count: 4
+replayProfile: "https://storage.blob.core.windows.net/profiles/replay.yaml.gz"
+
+# For PVC-based profile loading (alternative):
+# count: 4
+# replayProfile: "/mnt/profile/replay.yaml.gz"
+# replayPVCName: "replay-profile-pvc"
+
+# Optional: Node affinity for runner placement
+# nodeAffinity:
+#   node-type:
+#     - worker

@@ -1,0 +1,104 @@
+version: 1
+description: "Sample replay profile - Pod lifecycle simulation"
+spec:
+  runnerCount: 2
+  connsPerRunner: 2
+  clientsPerRunner: 10
+  contentType: json
+  disableHTTP2: false
+
+requests:
+  # Phase 1: Create some pods (t=0ms to t=100ms)
+  - timestamp: 0
+    verb: CREATE
+    namespace: default
+    resourceKind: Pod
+    name: nginx-1
+    apiPath: /api/v1/namespaces/default/pods
+    body: |
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "name": "nginx-1",
+          "namespace": "default"
+        },
+        "spec": {
+          "containers": [{
+            "name": "nginx",
+            "image": "nginx:latest"
+          }]
+        }
+      }
+
+  - timestamp: 50
+    verb: CREATE
+    namespace: default
+    resourceKind: Pod
+    name: nginx-2
+    apiPath: /api/v1/namespaces/default/pods
+    body: |
+      {
+        "apiVersion": "v1",
+        "kind": "Pod",
+        "metadata": {
+          "name": "nginx-2",
+          "namespace": "default"
+        },
+        "spec": {
+          "containers": [{
+            "name": "nginx",
+            "image": "nginx:latest"
+          }]
+        }
+      }
+
+  # Phase 2: List and Get operations (t=100ms to t=300ms)
+  - timestamp: 100
+    verb: LIST
+    namespace: default
+    resourceKind: Pod
+    apiPath: /api/v1/namespaces/default/pods
+
+  - timestamp: 150
+    verb: GET
+    namespace: default
+    resourceKind: Pod
+    name: nginx-1
+    apiPath: /api/v1/namespaces/default/pods/nginx-1
+
+  - timestamp: 200
+    verb: GET
+    namespace: default
+    resourceKind: Pod
+    name: nginx-2
+    apiPath: /api/v1/namespaces/default/pods/nginx-2
+
+  - timestamp: 250
+    verb: LIST
+    namespace: default
+    resourceKind: Pod
+    apiPath: /api/v1/namespaces/default/pods
+    labelSelector: app=nginx
+
+  # Phase 3: Delete pods (t=300ms to t=400ms)
+  - timestamp: 300
+    verb: DELETE
+    namespace: default
+    resourceKind: Pod
+    name: nginx-1
+    apiPath: /api/v1/namespaces/default/pods/nginx-1
+
+  - timestamp: 350
+    verb: DELETE
+    namespace: default
+    resourceKind: Pod
+    name: nginx-2
+    apiPath: /api/v1/namespaces/default/pods/nginx-2
+
+  # Phase 4: Final list to verify cleanup (t=400ms)
+  - timestamp: 400
+    verb: LIST
+    namespace: default
+    resourceKind: Pod
+    apiPath: /api/v1/namespaces/default/pods

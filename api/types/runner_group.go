@@ -21,6 +21,10 @@ type RunnerGroupSpec struct {
 	Count int32 `json:"count" yaml:"count"`
 	// Profile defines what the load traffic looks like.
 	Profile *LoadProfile `json:"loadProfile,omitempty" yaml:"loadProfile"`
+	// ReplayProfile defines the source for replay mode profile (URL or PVC path).
+	// When set, runners execute in replay mode instead of load profile mode.
+	// Supports: http(s):// URLs or local paths (e.g., /mnt/profile/replay.yaml.gz)
+	ReplayProfile *string `json:"replayProfile,omitempty" yaml:"replayProfile,omitempty"`
 	// NodeAffinity defines how to deploy runners into dedicated nodes
 	// which have specific labels.
 	NodeAffinity map[string][]string `json:"nodeAffinity,omitempty" yaml:"nodeAffinity,omitempty"`
@@ -30,6 +34,14 @@ type RunnerGroupSpec struct {
 	//
 	// FORMAT: APIVersion:Kind:Name:UID
 	OwnerReference *string `json:"ownerReference,omitempty" yaml:"ownerReference,omitempty"`
+	// ReplayPVCName is the name of the PVC to mount for replay profile.
+	// Only used when ReplayProfile is a local path (not URL).
+	ReplayPVCName *string `json:"replayPVCName,omitempty" yaml:"replayPVCName,omitempty"`
+}
+
+// IsReplayMode returns true if the spec is configured for replay mode.
+func (s *RunnerGroupSpec) IsReplayMode() bool {
+	return s.ReplayProfile != nil && *s.ReplayProfile != ""
 }
 
 // RunnerGroupStatus represents current state of RunnerGroup.
