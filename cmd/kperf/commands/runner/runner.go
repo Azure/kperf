@@ -328,24 +328,7 @@ func buildRunnerMetricReport(stats *request.Result, includeRawData bool) types.R
 		PercentileLatenciesByURL: map[string][][2]float64{},
 	}
 
-	total := 0
-	for _, latencies := range stats.LatenciesByURL {
-		total += len(latencies)
-	}
-	latencies := make([]float64, 0, total)
-	for _, l := range stats.LatenciesByURL {
-		latencies = append(latencies, l...)
-	}
-	output.PercentileLatencies = metrics.BuildPercentileLatencies(latencies)
-
-	for u, l := range stats.LatenciesByURL {
-		output.PercentileLatenciesByURL[u] = metrics.BuildPercentileLatencies(l)
-	}
-
-	if includeRawData {
-		output.LatenciesByURL = stats.LatenciesByURL
-		output.Errors = stats.Errors
-	}
+	metrics.BuildPercentileLatenciesReport(&output, stats.LatenciesByURL, includeRawData, stats.Errors)
 
 	return output
 }

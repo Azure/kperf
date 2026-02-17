@@ -19,6 +19,29 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
+// BuildPercentileLatenciesReport builds percentile latencies for a RunnerMetricReport
+// from a ResponseStats, populating both aggregate and per-URL percentiles.
+func BuildPercentileLatenciesReport(report *types.RunnerMetricReport, latenciesByURL map[string][]float64, includeRawData bool, respErrors []types.ResponseError) {
+	total := 0
+	for _, latencies := range latenciesByURL {
+		total += len(latencies)
+	}
+	allLatencies := make([]float64, 0, total)
+	for _, l := range latenciesByURL {
+		allLatencies = append(allLatencies, l...)
+	}
+	report.PercentileLatencies = BuildPercentileLatencies(allLatencies)
+
+	for u, l := range latenciesByURL {
+		report.PercentileLatenciesByURL[u] = BuildPercentileLatencies(l)
+	}
+
+	if includeRawData {
+		report.LatenciesByURL = latenciesByURL
+		report.Errors = respErrors
+	}
+}
+
 // BuildPercentileLatencies builds percentile latencies.
 func BuildPercentileLatencies(latencies []float64) [][2]float64 {
 	if len(latencies) == 0 {
