@@ -62,7 +62,11 @@ func (r ReplayRequest) Validate() error {
 
 // ObjectKey returns a key for partitioning: "namespace/kind/name".
 // For cluster-scoped resources, namespace is empty.
+// For LIST/WATCH operations (empty name), includes labelSelector for better distribution.
 func (r ReplayRequest) ObjectKey() string {
+	if r.Name == "" && r.LabelSelector != "" && (r.Verb == "LIST" || r.Verb == "WATCH") {
+		return fmt.Sprintf("%s/%s/?labelSelector=%s", r.Namespace, r.ResourceKind, r.LabelSelector)
+	}
 	return fmt.Sprintf("%s/%s/%s", r.Namespace, r.ResourceKind, r.Name)
 }
 

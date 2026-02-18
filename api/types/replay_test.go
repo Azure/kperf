@@ -147,6 +147,25 @@ func TestReplayRequestObjectKey(t *testing.T) {
 			},
 			want: "/Node/node-1",
 		},
+		{
+			name: "LIST with labelSelector",
+			req: ReplayRequest{
+				Namespace:     "default",
+				ResourceKind:  "Pod",
+				Verb:          "LIST",
+				LabelSelector: "app=nginx",
+			},
+			want: "default/Pod/?labelSelector=app=nginx",
+		},
+		{
+			name: "LIST without labelSelector",
+			req: ReplayRequest{
+				Namespace:    "default",
+				ResourceKind: "Pod",
+				Verb:         "LIST",
+			},
+			want: "default/Pod/",
+		},
 	}
 
 	for _, tt := range tests {

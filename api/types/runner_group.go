@@ -3,7 +3,11 @@
 
 package types
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	"fmt"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 // RunnerGroup defines a set of runners with same load profile.
 type RunnerGroup struct {
@@ -42,6 +46,17 @@ type RunnerGroupSpec struct {
 // IsReplayMode returns true if the spec is configured for replay mode.
 func (s *RunnerGroupSpec) IsReplayMode() bool {
 	return s.ReplayProfile != nil && *s.ReplayProfile != ""
+}
+
+// Validate verifies that RunnerGroupSpec is configured correctly.
+func (s *RunnerGroupSpec) Validate() error {
+	if s.Profile != nil && s.IsReplayMode() {
+		return fmt.Errorf("cannot set both loadProfile and replayProfile")
+	}
+	if s.Profile == nil && !s.IsReplayMode() {
+		return fmt.Errorf("either loadProfile or replayProfile must be set")
+	}
+	return nil
 }
 
 // RunnerGroupStatus represents current state of RunnerGroup.
