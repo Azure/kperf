@@ -19,3 +19,7 @@ WORKDIR /
 COPY --from=build-stage /output/bin/kperf /kperf
 COPY --from=build-stage /output/bin/runkperf /runkperf
 COPY scripts/run_runner.sh /run_runner.sh
+COPY scripts/run_replay.sh /run_replay.sh
+
+# Make scripts executable
+RUN chmod +x /run_runner.sh /run_replay.sh

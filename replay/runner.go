@@ -228,7 +228,10 @@ func (r *Runner) Run(ctx context.Context, replayStart time.Time) (*RunnerResult,
 	}
 
 	// Start worker pool
-	wg := r.startWorkers(ctx, workers)
+	wg, err := r.startWorkers(ctx, workers)
+	if err != nil {
+		return nil, err
+	}
 
 	startTime := time.Now()
 
@@ -371,8 +374,12 @@ func (r *Runner) Run(ctx context.Context, replayStart time.Time) (*RunnerResult,
 }
 
 // startWorkers creates the worker pool that processes requests from the channel.
-func (r *Runner) startWorkers(ctx context.Context, workers []*workerMetrics) *sync.WaitGroup {
+func (r *Runner) startWorkers(ctx context.Context, workers []*workerMetrics) (*sync.WaitGroup, error) {
 	var wg sync.WaitGroup
+
+	if len(r.restClis) == 0 {
+		return nil, fmt.Errorf("runner %d: no REST clients configured", r.index)
+	}
 
 	for i := 0; i < r.workerCount; i++ {
 		wg.Add(1)
@@ -404,7 +411,7 @@ func (r *Runner) startWorkers(ctx context.Context, workers []*workerMetrics) *sy
 		}(i, cli, workers[i])
 	}
 
-	return &wg
+	return &wg, nil
 }
 
 // executeRequestWithClient executes a single replay request with a specific client.
@@ -437,12 +444,11 @@ func (r *Runner) executeRequestWithClient(ctx context.Context, req *types.Replay
 	respMetric.ObserveReceivedBytes(bytes)
 
 	if err != nil {
-		// Check if error is due to context cancellation (expected for WATCH when replay ends)
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			// Context cancelled - treat as successful completion for WATCH operations
-			// This ensures cancelled WATCHes are counted in the total
+		// Context cancellation is expected for WATCH when replay ends (cancelled by runner).
+		// For non-WATCH requests, context cancellation is a real failure.
+		if req.Verb == "WATCH" && (errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)) {
 			respMetric.ObserveLatency(requester.Method(), requester.MaskedURL().String(), reportLatency)
-			klog.V(5).Infof("Request cancelled (expected): %s %s", req.Verb, req.APIPath)
+			klog.V(5).Infof("WATCH cancelled (expected): %s", req.APIPath)
 			return nil
 		}
 

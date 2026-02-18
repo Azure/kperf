@@ -180,6 +180,11 @@ func ScheduleSingleRunner(ctx context.Context, kubeconfigPath string, profile *t
 		workersPerRunner = profile.Spec.ConnsPerRunner
 	}
 
+	// Validate runner index
+	if runnerIndex < 0 || runnerIndex >= profile.Spec.RunnerCount {
+		return nil, fmt.Errorf("runner index %d is out of range [0, %d)", runnerIndex, profile.Spec.RunnerCount)
+	}
+
 	// Partition requests for this runner
 	requests := PartitionRequests(profile.Requests, profile.Spec.RunnerCount, runnerIndex)
 
@@ -290,10 +295,10 @@ func validateAndWarnConfig(profile *types.ReplayProfile, runnerRequests [][]type
 		}
 
 		// Warning: Insufficient workers for QPS
-		recommendedWorkers := int(qps/qpsPerWorkerEstimate) + qpsPerWorkerEstimate
+		recommendedWorkers := conns * 3
 		if workers < recommendedWorkers {
 			klog.Warningf("Runner %d: ClientsPerRunner (%d) may be insufficient for QPS (%.0f). "+
-				"Recommend at least %d workers (3-4x connections).",
+				"Recommend at least %d workers (3x connections).",
 				i, workers, qps, recommendedWorkers)
 		}
 
