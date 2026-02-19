@@ -295,10 +295,10 @@ func validateAndWarnConfig(profile *types.ReplayProfile, runnerRequests [][]type
 		}
 
 		// Warning: Insufficient workers for QPS
-		recommendedWorkers := conns * 3
+		recommendedWorkers := int(qps/qpsPerWorkerEstimate) + qpsPerWorkerEstimate
 		if workers < recommendedWorkers {
 			klog.Warningf("Runner %d: ClientsPerRunner (%d) may be insufficient for QPS (%.0f). "+
-				"Recommend at least %d workers (3x connections).",
+				"Recommend at least %d workers.",
 				i, workers, qps, recommendedWorkers)
 		}
 
