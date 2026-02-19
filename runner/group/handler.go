@@ -112,8 +112,11 @@ func (h *Handler) Info(ctx context.Context) *types.RunnerGroup {
 
 // Deploy deploys a group of runners.
 func (h *Handler) Deploy(ctx context.Context, uploadURL string) error {
-	if err := h.uploadLoadProfileAsConfigMap(ctx); err != nil {
-		return fmt.Errorf("failed to ensure if load profile has been uploaded: %w", err)
+	// Skip uploading config map for replay mode - profile is loaded from URL or PVC
+	if !h.spec.IsReplayMode() {
+		if err := h.uploadLoadProfileAsConfigMap(ctx); err != nil {
+			return fmt.Errorf("failed to ensure if load profile has been uploaded: %w", err)
+		}
 	}
 	return h.deployRunners(ctx, uploadURL)
 }
@@ -379,59 +382,119 @@ func (h *Handler) buildBatchJobObject(uploadURL string) *batchv1.Job {
 			"app-name-job": h.name,
 		},
 	}
+
+	// Build environment variables
+	envVars := []corev1.EnvVar{
+		{
+			Name: "POD_NAME",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: metav1.ObjectNameField,
+				},
+			},
+		},
+		{
+			Name: "POD_NAMESPACE",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.namespace",
+				},
+			},
+		},
+		{
+			Name: "POD_UID",
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "metadata.uid",
+				},
+			},
+		},
+		{
+			Name:  "TARGET_URL",
+			Value: uploadURL,
+		},
+		{
+			Name:  "RUNNER_VERBOSITY",
+			Value: strconv.Itoa(h.runnerVerbosity),
+		},
+	}
+
+	// Build volume mounts and volumes
+	volumeMounts := []corev1.VolumeMount{
+		{
+			Name:      "host-root-tmp",
+			MountPath: "/data",
+		},
+	}
+
+	volumes := []corev1.Volume{
+		{
+			Name: "host-root-tmp",
+			VolumeSource: corev1.VolumeSource{
+				HostPath: &corev1.HostPathVolumeSource{
+					Path: "/tmp",
+				},
+			},
+		},
+	}
+
+	// Determine command and configure mode-specific settings
+	command := []string{"/run_runner.sh"}
+
+	if h.spec.IsReplayMode() {
+		// Replay mode configuration
+		command = []string{"/run_replay.sh"}
+
+		// Add replay profile source env var
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  "REPLAY_PROFILE_SOURCE",
+			Value: *h.spec.ReplayProfile,
+		})
+
+		// If PVC is specified, mount it for local file access
+		if h.spec.ReplayPVCName != nil && *h.spec.ReplayPVCName != "" {
+			volumes = append(volumes, corev1.Volume{
+				Name: "replay-profile",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: *h.spec.ReplayPVCName,
+						ReadOnly:  true,
+					},
+				},
+			})
+			volumeMounts = append(volumeMounts, corev1.VolumeMount{
+				Name:      "replay-profile",
+				MountPath: "/mnt/profile",
+				ReadOnly:  true,
+			})
+		}
+	} else {
+		// Standard load profile mode - mount config map
+		volumes = append(volumes, corev1.Volume{
+			Name: "config",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: h.name,
+					},
+				},
+			},
+		})
+		volumeMounts = append(volumeMounts, corev1.VolumeMount{
+			Name:      "config",
+			MountPath: "/config",
+		})
+	}
+
 	job.Spec.Template.Spec = corev1.PodSpec{
 		Affinity: &corev1.Affinity{},
 		Containers: []corev1.Container{
 			{
-				Name:  "runner",
-				Image: h.imageRef,
-				Env: []corev1.EnvVar{
-					{
-						Name: "POD_NAME",
-						ValueFrom: &corev1.EnvVarSource{
-							FieldRef: &corev1.ObjectFieldSelector{
-								FieldPath: metav1.ObjectNameField,
-							},
-						},
-					},
-					{
-						Name: "POD_NAMESPACE",
-						ValueFrom: &corev1.EnvVarSource{
-							FieldRef: &corev1.ObjectFieldSelector{
-								FieldPath: "metadata.namespace",
-							},
-						},
-					},
-					{
-						Name: "POD_UID",
-						ValueFrom: &corev1.EnvVarSource{
-							FieldRef: &corev1.ObjectFieldSelector{
-								FieldPath: "metadata.uid",
-							},
-						},
-					},
-					{
-						Name:  "TARGET_URL",
-						Value: uploadURL,
-					},
-					{
-						Name:  "RUNNER_VERBOSITY",
-						Value: strconv.Itoa(h.runnerVerbosity),
-					},
-				},
-				VolumeMounts: []corev1.VolumeMount{
-					{
-						Name:      "config",
-						MountPath: "/config",
-					},
-					{
-						Name:      "host-root-tmp",
-						MountPath: "/data",
-					},
-				},
-				Command: []string{
-					"/run_runner.sh",
-				},
+				Name:         "runner",
+				Image:        h.imageRef,
+				Env:          envVars,
+				VolumeMounts: volumeMounts,
+				Command:      command,
 			},
 		},
 		RestartPolicy: corev1.RestartPolicyNever,
@@ -447,27 +510,7 @@ func (h *Handler) buildBatchJobObject(uploadURL string) *batchv1.Job {
 				},
 			},
 		},
-
-		Volumes: []corev1.Volume{
-			{
-				Name: "config",
-				VolumeSource: corev1.VolumeSource{
-					ConfigMap: &corev1.ConfigMapVolumeSource{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: h.name,
-						},
-					},
-				},
-			},
-			{
-				Name: "host-root-tmp",
-				VolumeSource: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: "/tmp",
-					},
-				},
-			},
-		},
+		Volumes: volumes,
 	}
 
 	if len(h.spec.NodeAffinity) > 0 {

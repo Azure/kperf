@@ -39,12 +39,12 @@ type timeBucket struct {
 }
 
 // workerMetrics holds per-worker statistics.
-// For normal workers, each goroutine has its own instance (no synchronization needed).
-// For WATCH metrics (shared across goroutines), atomic operations ensure correctness.
+// Each normal worker goroutine has its own instance (no synchronization needed).
+// WATCH metrics use fire-and-forget (no concurrent writes to requestsRun/requestsFailed).
 type workerMetrics struct {
 	respMetric     metrics.ResponseMetric
-	requestsRun    int32
-	requestsFailed int32
+	requestsRun    int
+	requestsFailed int
 }
 
 // groupIntoTimeBuckets groups requests by time buckets to reduce timer overhead.
@@ -228,7 +228,10 @@ func (r *Runner) Run(ctx context.Context, replayStart time.Time) (*RunnerResult,
 	}
 
 	// Start worker pool
-	wg := r.startWorkers(ctx, workers)
+	wg, err := r.startWorkers(ctx, workers)
+	if err != nil {
+		return nil, err
+	}
 
 	startTime := time.Now()
 
@@ -304,25 +307,12 @@ func (r *Runner) Run(ctx context.Context, replayStart time.Time) (*RunnerResult,
 				clis, err := request.NewClients(r.kubeconfigPath, 1, r.clientOpts...)
 				if err != nil {
 					klog.Errorf("Runner %d: failed to create overflow WATCH connection: %v", r.index, err)
-					atomic.AddInt32(&watchMetrics.requestsRun, 1)
-					atomic.AddInt32(&watchMetrics.requestsFailed, 1)
 					return
 				}
 				watchCli = clis[0]
 			}
 
-			// Check if context was cancelled during connection setup
-			select {
-			case <-watchCtx.Done():
-				return
-			default:
-			}
-
-			err := r.executeRequestWithClient(watchCtx, req, watchCli, watchMetrics.respMetric)
-			atomic.AddInt32(&watchMetrics.requestsRun, 1)
-			if err != nil {
-				atomic.AddInt32(&watchMetrics.requestsFailed, 1)
-			}
+			_ = r.executeRequestWithClient(watchCtx, req, watchCli, watchMetrics.respMetric)
 		}(req)
 	}
 
@@ -336,8 +326,8 @@ func (r *Runner) Run(ctx context.Context, replayStart time.Time) (*RunnerResult,
 	// Aggregate results from all workers (including WATCH metrics)
 	allMetrics := append(workers, watchMetrics)
 
-	var totalRun int32
-	var totalFailed int32
+	var totalRun int
+	var totalFailed int
 	aggregatedStats := types.ResponseStats{
 		Errors:             make([]types.ResponseError, 0),
 		LatenciesByURL:     make(map[string][]float64),
@@ -365,14 +355,18 @@ func (r *Runner) Run(ctx context.Context, replayStart time.Time) (*RunnerResult,
 		Total:          len(r.requests),
 		Duration:       time.Since(startTime),
 		ResponseStats:  aggregatedStats,
-		RequestsRun:    int(totalRun),
-		RequestsFailed: int(totalFailed),
+		RequestsRun:    totalRun,
+		RequestsFailed: totalFailed,
 	}, nil
 }
 
 // startWorkers creates the worker pool that processes requests from the channel.
-func (r *Runner) startWorkers(ctx context.Context, workers []*workerMetrics) *sync.WaitGroup {
+func (r *Runner) startWorkers(ctx context.Context, workers []*workerMetrics) (*sync.WaitGroup, error) {
 	var wg sync.WaitGroup
+
+	if len(r.restClis) == 0 {
+		return nil, fmt.Errorf("runner %d: no REST clients configured", r.index)
+	}
 
 	for i := 0; i < r.workerCount; i++ {
 		wg.Add(1)
@@ -395,16 +389,16 @@ func (r *Runner) startWorkers(ctx context.Context, workers []*workerMetrics) *sy
 				// Execute request with worker's dedicated connection (pointer, no copy)
 				err := r.executeRequestWithClient(ctx, req, restCli, wm.respMetric)
 
-				// Track metrics (per-worker, no contention for normal workers)
-				atomic.AddInt32(&wm.requestsRun, 1)
+				// Track metrics (per-worker, no contention)
+				wm.requestsRun++
 				if err != nil {
-					atomic.AddInt32(&wm.requestsFailed, 1)
+					wm.requestsFailed++
 				}
 			}
 		}(i, cli, workers[i])
 	}
 
-	return &wg
+	return &wg, nil
 }
 
 // executeRequestWithClient executes a single replay request with a specific client.
@@ -437,10 +431,9 @@ func (r *Runner) executeRequestWithClient(ctx context.Context, req *types.Replay
 	respMetric.ObserveReceivedBytes(bytes)
 
 	if err != nil {
-		// Check if error is due to context cancellation (expected for WATCH when replay ends)
+		// Context cancellation is expected when replay duration expires.
+		// In-flight requests of any verb get cancelled — treat as success.
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			// Context cancelled - treat as successful completion for WATCH operations
-			// This ensures cancelled WATCHes are counted in the total
 			respMetric.ObserveLatency(requester.Method(), requester.MaskedURL().String(), reportLatency)
 			klog.V(5).Infof("Request cancelled (expected): %s %s", req.Verb, req.APIPath)
 			return nil
