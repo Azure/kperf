@@ -121,6 +121,12 @@ func Schedule(ctx context.Context, kubeconfigPath string, profile *types.ReplayP
 		)
 	}
 
+	// Enforce a hard deadline at the profile duration so the replay doesn't overrun.
+	// Add a small grace period for the last batch of in-flight requests.
+	profileDuration := time.Duration(profile.Duration()) * time.Millisecond
+	replayCtx, cancelReplay := context.WithTimeout(ctx, profileDuration+30*time.Second)
+	defer cancelReplay()
+
 	// Synchronize start time across all runners
 	startTime := time.Now()
 
@@ -133,7 +139,7 @@ func Schedule(ctx context.Context, kubeconfigPath string, profile *types.ReplayP
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
-			result, err := runners[idx].Run(ctx, startTime)
+			result, err := runners[idx].Run(replayCtx, startTime)
 			results[idx] = result
 			runnerErrors[idx] = err
 		}(i)
@@ -213,10 +219,15 @@ func ScheduleSingleRunner(ctx context.Context, kubeconfigPath string, profile *t
 		clientOpts,
 	)
 
+	// Enforce a hard deadline at the profile duration so the replay doesn't overrun.
+	profileDuration := time.Duration(profile.Duration()) * time.Millisecond
+	replayCtx, cancelReplay := context.WithTimeout(ctx, profileDuration+30*time.Second)
+	defer cancelReplay()
+
 	// Use current time as start (each pod will have slightly different start times)
 	replayStart := time.Now()
 
-	return runner.Run(ctx, replayStart)
+	return runner.Run(replayCtx, replayStart)
 }
 
 // aggregateResults combines results from all runners.
