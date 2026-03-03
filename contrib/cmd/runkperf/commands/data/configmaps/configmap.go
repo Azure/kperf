@@ -44,6 +44,16 @@ var Command = cli.Command{
 			Usage: "Namespace to use with commands. If the namespace does not exist, it will be created.",
 			Value: "default",
 		},
+		cli.Float64Flag{
+			Name:  "qps",
+			Usage: "QPS for the Kubernetes client rate limiter to control configmap operations",
+			Value: 30,
+		},
+		cli.IntFlag{
+			Name:  "burst",
+			Usage: "Burst for the Kubernetes client rate limiter to control configmap operations",
+			Value: 10,
+		},
 	},
 	Subcommands: []cli.Command{
 		configmapAddCommand,
@@ -94,12 +104,15 @@ var configmapAddCommand = cli.Command{
 		}
 
 		namespace := cliCtx.GlobalString("namespace")
-		err = prepareNamespace(kubeCfgPath, namespace)
+		qps := float32(cliCtx.GlobalFloat64("qps"))
+		burst := cliCtx.GlobalInt("burst")
+
+		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
 			return err
 		}
 
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		err = prepareNamespace(clientset, namespace)
 		if err != nil {
 			return err
 		}
@@ -129,9 +142,11 @@ var configmapDelCommand = cli.Command{
 
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
+		qps := float32(cliCtx.GlobalFloat64("qps"))
+		burst := cliCtx.GlobalInt("burst")
 		labelSelector := fmt.Sprintf("app=%s,cmName=%s", appLebel, cmName)
 
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
 			return err
 		}
@@ -155,7 +170,9 @@ var configmapListCommand = cli.Command{
 	Action: func(cliCtx *cli.Context) error {
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		qps := float32(cliCtx.GlobalFloat64("qps"))
+		burst := cliCtx.GlobalInt("burst")
+		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
 			return err
 		}
@@ -201,7 +218,7 @@ var configmapListCommand = cli.Command{
 	},
 }
 
-func prepareNamespace(kubeCfgPath string, namespace string) error {
+func prepareNamespace(clientset *kubernetes.Clientset, namespace string) error {
 	if namespace == "" {
 		return fmt.Errorf("namespace cannot be empty")
 	}
@@ -210,12 +227,7 @@ func prepareNamespace(kubeCfgPath string, namespace string) error {
 		return nil
 	}
 
-	clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
-	if err != nil {
-		return err
-	}
-
-	_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
 		},
