@@ -16,8 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/flowcontrol"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
 
 	"github.com/urfave/cli"
 
@@ -107,7 +106,7 @@ var configmapAddCommand = cli.Command{
 		qps := float32(cliCtx.GlobalFloat64("qps"))
 		burst := cliCtx.GlobalInt("burst")
 
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, qps, burst)
+		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
 			return err
 		}
@@ -142,11 +141,9 @@ var configmapDelCommand = cli.Command{
 
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		qps := float32(cliCtx.GlobalFloat64("qps"))
-		burst := cliCtx.GlobalInt("burst")
 		labelSelector := fmt.Sprintf("app=%s,cmName=%s", appLebel, cmName)
 
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, qps, burst)
+		clientset, err := data.NewClientset(kubeCfgPath)
 		if err != nil {
 			return err
 		}
@@ -170,9 +167,7 @@ var configmapListCommand = cli.Command{
 	Action: func(cliCtx *cli.Context) error {
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		qps := float32(cliCtx.GlobalFloat64("qps"))
-		burst := cliCtx.GlobalInt("burst")
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, qps, burst)
+		clientset, err := data.NewClientset(kubeCfgPath)
 		if err != nil {
 			return err
 		}
@@ -256,21 +251,6 @@ func checkConfigmapParams(size int, groupSize int, total int) error {
 		return fmt.Errorf("group-size must be less than or equal to total")
 	}
 	return nil
-}
-
-func newClientsetWithRateLimiter(kubeCfgPath string, qps float32, burst int) (*kubernetes.Clientset, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
-	if err != nil {
-		return nil, err
-	}
-
-	config.QPS = qps
-	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(qps, burst)
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	return clientset, nil
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

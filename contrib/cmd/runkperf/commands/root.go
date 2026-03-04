@@ -11,11 +11,20 @@ import (
 
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/bench"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/configmaps"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/daemonsets"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/warmup"
 
 	"github.com/urfave/cli"
 	"k8s.io/klog/v2"
 )
+
+func init() {
+	data.RegisterSubcommands(
+		configmaps.Command,
+		daemonsets.Command,
+	)
+}
 
 // App returns kperf application.
 func App() *cli.App {
