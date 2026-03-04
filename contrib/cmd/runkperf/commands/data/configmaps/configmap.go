@@ -47,12 +47,12 @@ var Command = cli.Command{
 		cli.Float64Flag{
 			Name:  "qps",
 			Usage: "QPS for the Kubernetes client rate limiter to control configmap operations",
-			Value: 30,
+			Value: 500,
 		},
 		cli.IntFlag{
 			Name:  "burst",
 			Usage: "Burst for the Kubernetes client rate limiter to control configmap operations",
-			Value: 10,
+			Value: 1000,
 		},
 	},
 	Subcommands: []cli.Command{
