@@ -149,6 +149,7 @@ type requestGetBuilder struct {
 	namespace       string
 	name            string
 	resourceVersion string
+	keySpaceSize    int
 	maxRetries      int
 }
 
@@ -162,6 +163,7 @@ func newRequestGetBuilder(src *types.RequestGet, resourceVersion string, maxRetr
 		namespace:       src.Namespace,
 		name:            src.Name,
 		resourceVersion: resourceVersion,
+		keySpaceSize:    src.KeySpaceSize,
 		maxRetries:      maxRetries,
 	}
 }
@@ -178,7 +180,13 @@ func (b *requestGetBuilder) Build(cli rest.Interface) Requester {
 	if b.namespace != "" {
 		comps = append(comps, "namespaces", b.namespace)
 	}
-	comps = append(comps, b.resource, b.name)
+
+	finalName := b.name
+	if b.keySpaceSize > 0 {
+		randomInt, _ := rand.Int(rand.Reader, big.NewInt(int64(b.keySpaceSize)))
+		finalName = fmt.Sprintf("%s-%d", b.name, randomInt.Int64())
+	}
+	comps = append(comps, b.resource, finalName)
 
 	return &DiscardRequester{
 		BaseRequester: BaseRequester{

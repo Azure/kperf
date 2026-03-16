@@ -43,9 +43,9 @@ func (reqr *BaseRequester) URL() *url.URL {
 func (reqr *BaseRequester) MaskedURL() *url.URL {
 	originalURL := reqr.req.URL()
 
-	// Aggregates for DELETE and PATCH methods, replaces the last path segment
-	// for DELETE and PATCH requests so they can be aggregated (e.g. in metrics)
-	if reqr.method == http.MethodDelete || reqr.method == http.MethodPatch {
+	// Aggregates for DELETE, PATCH, and GET methods, replaces the last path segment
+	// for DELETE, PATCH, and GET requests so they can be aggregated (e.g. in metrics)
+	if reqr.method == http.MethodDelete || reqr.method == http.MethodPatch || reqr.method == http.MethodGet {
 		if u, err := url.Parse(originalURL.String()); err == nil {
 			u.Path = path.Join(path.Dir(u.Path), ":name")
 			return u // String() will keep ":name" as-is
