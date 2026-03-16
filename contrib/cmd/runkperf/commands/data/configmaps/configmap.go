@@ -16,8 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/flowcontrol"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
 
 	"github.com/urfave/cli"
 
@@ -72,6 +71,16 @@ var configmapAddCommand = cli.Command{
 			Usage: "Total amount of configmaps",
 			Value: 10,
 		},
+		cli.Float64Flag{
+			Name:  "qps",
+			Usage: "QPS for the Kubernetes client rate limiter to control configmap operations",
+			Value: 30,
+		},
+		cli.IntFlag{
+			Name:  "burst",
+			Usage: "Burst for the Kubernetes client rate limiter to control configmap operations",
+			Value: 10,
+		},
 	},
 	Action: func(cliCtx *cli.Context) error {
 		if cliCtx.NArg() != 1 {
@@ -94,12 +103,15 @@ var configmapAddCommand = cli.Command{
 		}
 
 		namespace := cliCtx.GlobalString("namespace")
-		err = prepareNamespace(kubeCfgPath, namespace)
+		qps := float32(cliCtx.Float64("qps"))
+		burst := cliCtx.Int("burst")
+
+		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
 			return err
 		}
 
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		err = prepareNamespace(clientset, namespace)
 		if err != nil {
 			return err
 		}
@@ -131,7 +143,7 @@ var configmapDelCommand = cli.Command{
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 		labelSelector := fmt.Sprintf("app=%s,cmName=%s", appLebel, cmName)
 
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		clientset, err := data.NewClientset(kubeCfgPath)
 		if err != nil {
 			return err
 		}
@@ -155,7 +167,7 @@ var configmapListCommand = cli.Command{
 	Action: func(cliCtx *cli.Context) error {
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		clientset, err := data.NewClientset(kubeCfgPath)
 		if err != nil {
 			return err
 		}
@@ -201,7 +213,7 @@ var configmapListCommand = cli.Command{
 	},
 }
 
-func prepareNamespace(kubeCfgPath string, namespace string) error {
+func prepareNamespace(clientset *kubernetes.Clientset, namespace string) error {
 	if namespace == "" {
 		return fmt.Errorf("namespace cannot be empty")
 	}
@@ -210,12 +222,7 @@ func prepareNamespace(kubeCfgPath string, namespace string) error {
 		return nil
 	}
 
-	clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
-	if err != nil {
-		return err
-	}
-
-	_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
+	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespace,
 		},
@@ -244,21 +251,6 @@ func checkConfigmapParams(size int, groupSize int, total int) error {
 		return fmt.Errorf("group-size must be less than or equal to total")
 	}
 	return nil
-}
-
-func newClientsetWithRateLimiter(kubeCfgPath string, qps float32, burst int) (*kubernetes.Clientset, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
-	if err != nil {
-		return nil, err
-	}
-
-	config.QPS = qps
-	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(qps, burst)
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	return clientset, nil
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
