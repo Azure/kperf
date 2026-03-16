@@ -43,16 +43,6 @@ var Command = cli.Command{
 			Usage: "Namespace to use with commands. If the namespace does not exist, it will be created.",
 			Value: "default",
 		},
-		cli.Float64Flag{
-			Name:  "qps",
-			Usage: "QPS for the Kubernetes client rate limiter to control configmap operations",
-			Value: 500,
-		},
-		cli.IntFlag{
-			Name:  "burst",
-			Usage: "Burst for the Kubernetes client rate limiter to control configmap operations",
-			Value: 1000,
-		},
 	},
 	Subcommands: []cli.Command{
 		configmapAddCommand,
@@ -81,6 +71,16 @@ var configmapAddCommand = cli.Command{
 			Usage: "Total amount of configmaps",
 			Value: 10,
 		},
+		cli.Float64Flag{
+			Name:  "qps",
+			Usage: "QPS for the Kubernetes client rate limiter to control configmap operations",
+			Value: 30,
+		},
+		cli.IntFlag{
+			Name:  "burst",
+			Usage: "Burst for the Kubernetes client rate limiter to control configmap operations",
+			Value: 10,
+		},
 	},
 	Action: func(cliCtx *cli.Context) error {
 		if cliCtx.NArg() != 1 {
@@ -103,8 +103,8 @@ var configmapAddCommand = cli.Command{
 		}
 
 		namespace := cliCtx.GlobalString("namespace")
-		qps := float32(cliCtx.GlobalFloat64("qps"))
-		burst := cliCtx.GlobalInt("burst")
+		qps := float32(cliCtx.Float64("qps"))
+		burst := cliCtx.Int("burst")
 
 		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
