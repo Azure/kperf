@@ -5,9 +5,7 @@ package events
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -245,24 +243,6 @@ type eventSetInfo struct {
 	total     int
 }
 
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func randString(n int) (string, error) {
-	if n <= 0 {
-		return "", fmt.Errorf("length must be positive")
-	}
-
-	b := make([]rune, n)
-	for i := range b {
-		random, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
-		if err != nil {
-			return "", fmt.Errorf("error generating random number: %w", err)
-		}
-		b[i] = letterRunes[int(random.Int64())]
-	}
-	return string(b), nil
-}
-
 func createEvents(clientset *kubernetes.Clientset, namespace, evName string, total, groupSize int, reason, eventType string, messageSize int, involvedObjectKind, involvedObjectName string) error {
 	now := time.Now()
 
@@ -273,7 +253,7 @@ func createEvents(clientset *kubernetes.Clientset, namespace, evName string, tot
 			g.Go(func() error {
 				name := fmt.Sprintf("%s-ev-%s-%d", appLabel, evName, idx)
 
-				message, err := randString(messageSize)
+				message, err := data.RandString(messageSize)
 				if err != nil {
 					return fmt.Errorf("failed to generate random message for event %s: %v", name, err)
 				}
