@@ -26,6 +26,10 @@ import (
 
 var appLabel = "runkperf"
 
+// defaultBatchSize is the number of secrets to list or delete per batch.
+// It is used as the page size for paginated API calls and the concurrency limit for parallel deletions.
+const defaultBatchSize int64 = 300
+
 var Command = cli.Command{
 	Name:      "secret",
 	ShortName: "sec",
@@ -127,6 +131,23 @@ var secretDelCommand = cli.Command{
 	ShortName: "del",
 	ArgsUsage: "NAME",
 	Usage:     "Delete a secrets set",
+	Flags: []cli.Flag{
+		cli.Float64Flag{
+			Name:  "qps",
+			Usage: "QPS for the Kubernetes client rate limiter to control secret deletion",
+			Value: 100,
+		},
+		cli.IntFlag{
+			Name:  "burst",
+			Usage: "Burst for the Kubernetes client rate limiter to control secret deletion",
+			Value: 200,
+		},
+		cli.IntFlag{
+			Name:  "group-size",
+			Usage: "Number of secrets to delete in parallel per batch",
+			Value: 30,
+		},
+	},
 	Action: func(cliCtx *cli.Context) error {
 		if cliCtx.NArg() != 1 {
 			return fmt.Errorf("required only one secrets set name")
@@ -138,14 +159,17 @@ var secretDelCommand = cli.Command{
 
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
+		qps := float32(cliCtx.Float64("qps"))
+		burst := cliCtx.Int("burst")
+		groupSize := cliCtx.Int("group-size")
 		labelSelector := fmt.Sprintf("app=%s,secName=%s", appLabel, secName)
 
-		clientset, err := data.NewClientset(kubeCfgPath)
+		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
 			return err
 		}
 
-		err = deleteSecrets(clientset, labelSelector, namespace)
+		err = deleteSecrets(clientset, labelSelector, namespace, groupSize)
 		if err != nil {
 			return err
 		}
@@ -158,7 +182,7 @@ var secretDelCommand = cli.Command{
 var secretListCommand = cli.Command{
 	Name:      "list",
 	Usage:     "List generated secrets. Lists all if no arguments are given; otherwise, provide secret set names separated by spaces.",
-	ArgsUsage: "NAME",
+	ArgsUsage: "[NAME ...]",
 	Action: func(cliCtx *cli.Context) error {
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
@@ -179,25 +203,61 @@ var secretListCommand = cli.Command{
 
 		var labelSelector string
 		if cliCtx.NArg() == 0 {
-			labelSelector = fmt.Sprintf("app=%s,secName", appLabel)
+			labelSelector = fmt.Sprintf("app=%s", appLabel)
 		} else {
 			args := cliCtx.Args()
 			namesStr := strings.Join(args, ",")
 			labelSelector = fmt.Sprintf("app=%s, secName in (%s)", appLabel, namesStr)
 		}
 
-		secMap := make(map[string][]int)
-		err = listSecretsByName(clientset, labelSelector, namespace, secMap)
+		type secretSetInfo struct {
+			size    int
+			total   int
+			ownerID map[string]int // ownerID -> count of secrets in that group
+		}
+		secMap := make(map[string]*secretSetInfo)
+		err = listSecrets(clientset, labelSelector, namespace, defaultBatchSize, func(sec corev1.Secret) error {
+			name, ok := sec.Labels["secName"]
+			if !ok {
+				return fmt.Errorf("failed to find the secName of secret %s", sec.Name)
+			}
+
+			info, ok := secMap[name]
+			if !ok {
+				info = &secretSetInfo{
+					ownerID: make(map[string]int),
+				}
+				if d, exists := sec.Data["data"]; exists {
+					info.size = len(d)
+				}
+				secMap[name] = info
+			}
+
+			info.total++
+
+			ownerID, ok := sec.Labels["ownerID"]
+			if !ok {
+				return fmt.Errorf("failed to find the ownerID of secret %s", name)
+			}
+			info.ownerID[ownerID]++
+			return nil
+		})
 		if err != nil {
 			return err
 		}
 
-		for key, value := range secMap {
+		for name, info := range secMap {
+			// Determine group size from the first ownerID group count
+			groupSize := 0
+			for _, count := range info.ownerID {
+				groupSize = count
+				break
+			}
 			fmt.Fprintf(tw, "%s\t%d\t%d\t%d\n",
-				key,
-				value[0],
-				value[1],
-				value[2],
+				name,
+				info.size,
+				groupSize,
+				info.total,
 			)
 		}
 		return tw.Flush()
@@ -263,25 +323,30 @@ func createSecrets(clientset *kubernetes.Clientset, namespace string, secName st
 	return nil
 }
 
-func deleteSecrets(clientset *kubernetes.Clientset, labelSelector string, namespace string) error {
-	secrets, err := listSecrets(clientset, labelSelector, namespace)
+func deleteSecrets(clientset *kubernetes.Clientset, labelSelector string, namespace string, groupSize int) error {
+	var names []string
+	err := listSecrets(clientset, labelSelector, namespace, defaultBatchSize, func(sec corev1.Secret) error {
+		names = append(names, sec.Name)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
 
-	if len(secrets.Items) == 0 {
-		return fmt.Errorf("no secrets set found in namespace: %s", namespace)
+	if len(names) == 0 {
+		fmt.Printf("No secrets found in namespace %s, nothing to delete\n", namespace)
+		return nil
 	}
 
-	n, batch := len(secrets.Items), 300
-	for i := 0; i < n; i += batch {
+	n := len(names)
+	for i := 0; i < n; i += groupSize {
 		g := new(errgroup.Group)
-		for j := i; j < i+batch && j < n; j++ {
+		for j := i; j < i+groupSize && j < n; j++ {
 			idx := j
 			g.Go(func() error {
-				err := clientset.CoreV1().Secrets(namespace).Delete(context.TODO(), secrets.Items[idx].Name, metav1.DeleteOptions{})
+				err := clientset.CoreV1().Secrets(namespace).Delete(context.TODO(), names[idx], metav1.DeleteOptions{})
 				if err != nil && !errors.IsNotFound(err) {
-					return fmt.Errorf("failed to delete secret %s: %v", secrets.Items[idx].Name, err)
+					return fmt.Errorf("failed to delete secret %s: %v", names[idx], err)
 				}
 				return nil
 			})
@@ -293,53 +358,30 @@ func deleteSecrets(clientset *kubernetes.Clientset, labelSelector string, namesp
 	return nil
 }
 
-func listSecrets(clientset *kubernetes.Clientset, labelSelector string, namespace string) (*corev1.SecretList, error) {
-	secrets, err := clientset.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list secrets: %v", err)
+func listSecrets(clientset *kubernetes.Clientset, labelSelector string, namespace string, limit int64, fn func(corev1.Secret) error) error {
+	if limit <= 0 {
+		limit = defaultBatchSize
 	}
-	return secrets, nil
-}
-
-func listSecretsByName(clientset *kubernetes.Clientset, labelSelector string, namespace string, secMap map[string][]int) error {
-	secrets, err := listSecrets(clientset, labelSelector, namespace)
-	if err != nil {
-		return err
-	}
-
-	for _, sec := range secrets.Items {
-		name, ok := sec.Labels["secName"]
-		if !ok {
-			return fmt.Errorf("failed to find the secName of secret %s", sec.Name)
+	var continueToken string
+	for {
+		secrets, err := clientset.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+			Limit:         limit,
+			Continue:      continueToken,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to list secrets: %v", err)
 		}
 
-		_, ok = secMap[name]
-		if !ok {
-			// Initialize: size, group-size, total
-			secMap[name] = []int{0, 0, 0}
-
-			if data, exists := sec.Data["data"]; exists {
-				secMap[name][0] = len(data)
+		for _, sec := range secrets.Items {
+			if err := fn(sec); err != nil {
+				return err
 			}
 		}
 
-		secMap[name][2]++
-
-		if secMap[name][1] != 0 {
-			continue
-		}
-
-		ownerID, ok := sec.Labels["ownerID"]
-		if !ok {
-			return fmt.Errorf("failed to find the ownerID of secret %s", name)
-		}
-
-		if ownerIDInt, err := strconv.Atoi(ownerID); err == nil {
-			if ownerIDInt > secMap[name][1] {
-				secMap[name][1] = ownerIDInt
-			}
-		} else {
-			return fmt.Errorf("failed to convert ownerID %s to int: %v", ownerID, err)
+		continueToken = secrets.Continue
+		if continueToken == "" {
+			break
 		}
 	}
 	return nil
