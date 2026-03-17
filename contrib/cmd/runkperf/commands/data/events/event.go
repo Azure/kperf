@@ -26,6 +26,10 @@ import (
 
 var appLabel = "runkperf"
 
+// defaultBatchSize is the number of events to list or delete per batch.
+// It is used as the page size for paginated API calls and the concurrency limit for parallel deletions.
+const defaultBatchSize int64 = 300
+
 var Command = cli.Command{
 	Name:      "event",
 	ShortName: "ev",
@@ -104,8 +108,8 @@ var eventAddCommand = cli.Command{
 		if cliCtx.NArg() != 1 {
 			return fmt.Errorf("required only one argument as events set name: %v", cliCtx.Args())
 		}
-		evName := strings.TrimSpace(cliCtx.Args().Get(0))
-		if len(evName) == 0 {
+		eventSetName := strings.TrimSpace(cliCtx.Args().Get(0))
+		if len(eventSetName) == 0 {
 			return fmt.Errorf("required non-empty event set name")
 		}
 
@@ -147,12 +151,12 @@ var eventAddCommand = cli.Command{
 			return err
 		}
 
-		err = createEvents(clientset, namespace, evName, total, groupSize, reason, eventType, messageSize, involvedObjectKind, involvedObjectName)
+		err = createEvents(clientset, namespace, eventSetName, total, groupSize, reason, eventType, messageSize, involvedObjectKind, involvedObjectName)
 		if err != nil {
 			return err
 		}
 		fmt.Printf("Created %d events (set=%s, reason=%s, type=%s) in namespace %s\n",
-			total, evName, reason, eventType, namespace)
+			total, eventSetName, reason, eventType, namespace)
 		return nil
 	},
 }
@@ -162,37 +166,58 @@ var eventDelCommand = cli.Command{
 	ShortName: "del",
 	ArgsUsage: "NAME",
 	Usage:     "Delete an events set",
+	Flags: []cli.Flag{
+		cli.Float64Flag{
+			Name:  "qps",
+			Usage: "QPS for the Kubernetes client rate limiter to control event deletion",
+			Value: 100,
+		},
+		cli.IntFlag{
+			Name:  "burst",
+			Usage: "Burst for the Kubernetes client rate limiter to control event deletion",
+			Value: 200,
+		},
+		cli.IntFlag{
+			Name:  "group-size",
+			Usage: "Number of events to delete in parallel per batch",
+			Value: 30,
+		},
+	},
 	Action: func(cliCtx *cli.Context) error {
 		if cliCtx.NArg() != 1 {
 			return fmt.Errorf("required only one events set name")
 		}
-		evName := strings.TrimSpace(cliCtx.Args().Get(0))
-		if len(evName) == 0 {
+		eventSetName := strings.TrimSpace(cliCtx.Args().Get(0))
+		if len(eventSetName) == 0 {
 			return fmt.Errorf("required non-empty events set name")
 		}
 
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		labelSelector := fmt.Sprintf("app=%s,evName=%s", appLabel, evName)
+		qps := float32(cliCtx.Float64("qps"))
+		burst := cliCtx.Int("burst")
+		groupSize := cliCtx.Int("group-size")
+		labelSelector := fmt.Sprintf("app=%s,eventSetName=%s", appLabel, eventSetName)
 
-		clientset, err := data.NewClientset(kubeCfgPath)
+		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
 			return err
 		}
 
-		err = deleteEvents(clientset, labelSelector, namespace)
+		err = deleteEvents(clientset, labelSelector, namespace, groupSize)
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("Deleted events set %s in %s namespace\n", evName, namespace)
+		fmt.Printf("Deleted events set %s in %s namespace\n", eventSetName, namespace)
 		return nil
 	},
 }
 
 var eventListCommand = cli.Command{
-	Name:  "list",
-	Usage: "List generated event sets. Lists all if no arguments are given; otherwise, provide event set names separated by spaces.",
+	Name:      "list",
+	Usage:     "List generated event sets. Lists all if no arguments are given; otherwise, provide event set names separated by spaces.",
+	ArgsUsage: "[NAME ...]",
 	Action: func(cliCtx *cli.Context) error {
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
@@ -213,14 +238,31 @@ var eventListCommand = cli.Command{
 
 		var labelSelector string
 		if cliCtx.NArg() == 0 {
-			labelSelector = fmt.Sprintf("app=%s,evName", appLabel)
+			labelSelector = fmt.Sprintf("app=%s", appLabel)
 		} else {
 			args := cliCtx.Args()
 			namesStr := strings.Join(args, ",")
-			labelSelector = fmt.Sprintf("app=%s, evName in (%s)", appLabel, namesStr)
+			labelSelector = fmt.Sprintf("app=%s, eventSetName in (%s)", appLabel, namesStr)
 		}
 
-		evMap, err := listEventsByName(clientset, labelSelector, namespace)
+		evMap := make(map[string]*eventSetInfo)
+		err = listEvents(clientset, labelSelector, namespace, defaultBatchSize, func(ev corev1.Event) error {
+			name, ok := ev.Labels["eventSetName"]
+			if !ok {
+				return nil
+			}
+
+			info, ok := evMap[name]
+			if !ok {
+				info = &eventSetInfo{
+					eventType: ev.Type,
+					reason:    ev.Reason,
+				}
+				evMap[name] = info
+			}
+			info.total++
+			return nil
+		})
 		if err != nil {
 			return err
 		}
@@ -243,7 +285,7 @@ type eventSetInfo struct {
 	total     int
 }
 
-func createEvents(clientset *kubernetes.Clientset, namespace, evName string, total, groupSize int, reason, eventType string, messageSize int, involvedObjectKind, involvedObjectName string) error {
+func createEvents(clientset *kubernetes.Clientset, namespace, eventSetName string, total, groupSize int, reason, eventType string, messageSize int, involvedObjectKind, involvedObjectName string) error {
 	now := time.Now()
 
 	for i := 0; i < total; i += groupSize {
@@ -251,7 +293,7 @@ func createEvents(clientset *kubernetes.Clientset, namespace, evName string, tot
 		for j := i; j < i+groupSize && j < total; j++ {
 			idx := j
 			g.Go(func() error {
-				name := fmt.Sprintf("%s-ev-%s-%d", appLabel, evName, idx)
+				name := fmt.Sprintf("%s-ev-%s-%d", appLabel, eventSetName, idx)
 
 				message, err := data.RandString(messageSize)
 				if err != nil {
@@ -260,7 +302,7 @@ func createEvents(clientset *kubernetes.Clientset, namespace, evName string, tot
 
 				objName := involvedObjectName
 				if objName == "" {
-					objName = fmt.Sprintf("%s-obj-%d", evName, idx)
+					objName = fmt.Sprintf("%s-obj-%d", eventSetName, idx)
 				}
 
 				event := &corev1.Event{
@@ -268,8 +310,8 @@ func createEvents(clientset *kubernetes.Clientset, namespace, evName string, tot
 						Name:      name,
 						Namespace: namespace,
 						Labels: map[string]string{
-							"app":    appLabel,
-							"evName": evName,
+							"app":          appLabel,
+							"eventSetName": eventSetName,
 						},
 					},
 					InvolvedObject: corev1.ObjectReference{
@@ -302,25 +344,30 @@ func createEvents(clientset *kubernetes.Clientset, namespace, evName string, tot
 	return nil
 }
 
-func deleteEvents(clientset *kubernetes.Clientset, labelSelector, namespace string) error {
-	eventList, err := listEvents(clientset, labelSelector, namespace)
+func deleteEvents(clientset *kubernetes.Clientset, labelSelector, namespace string, groupSize int) error {
+	var names []string
+	err := listEvents(clientset, labelSelector, namespace, defaultBatchSize, func(ev corev1.Event) error {
+		names = append(names, ev.Name)
+		return nil
+	})
 	if err != nil {
 		return err
 	}
 
-	if len(eventList.Items) == 0 {
-		return fmt.Errorf("no events set found in namespace: %s", namespace)
+	if len(names) == 0 {
+		fmt.Printf("No events found in namespace %s, nothing to delete\n", namespace)
+		return nil
 	}
 
-	n, batch := len(eventList.Items), 300
-	for i := 0; i < n; i += batch {
+	n := len(names)
+	for i := 0; i < n; i += groupSize {
 		g := new(errgroup.Group)
-		for j := i; j < i+batch && j < n; j++ {
+		for j := i; j < i+groupSize && j < n; j++ {
 			idx := j
 			g.Go(func() error {
-				err := clientset.CoreV1().Events(namespace).Delete(context.TODO(), eventList.Items[idx].Name, metav1.DeleteOptions{})
+				err := clientset.CoreV1().Events(namespace).Delete(context.TODO(), names[idx], metav1.DeleteOptions{})
 				if err != nil && !errors.IsNotFound(err) {
-					return fmt.Errorf("failed to delete event %s: %v", eventList.Items[idx].Name, err)
+					return fmt.Errorf("failed to delete event %s: %v", names[idx], err)
 				}
 				return nil
 			})
@@ -332,36 +379,31 @@ func deleteEvents(clientset *kubernetes.Clientset, labelSelector, namespace stri
 	return nil
 }
 
-func listEvents(clientset *kubernetes.Clientset, labelSelector, namespace string) (*corev1.EventList, error) {
-	eventList, err := clientset.CoreV1().Events(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labelSelector})
-	if err != nil {
-		return nil, fmt.Errorf("failed to list events: %v", err)
+func listEvents(clientset *kubernetes.Clientset, labelSelector, namespace string, limit int64, fn func(corev1.Event) error) error {
+	if limit <= 0 {
+		limit = defaultBatchSize
 	}
-	return eventList, nil
-}
-
-func listEventsByName(clientset *kubernetes.Clientset, labelSelector, namespace string) (map[string]*eventSetInfo, error) {
-	eventList, err := listEvents(clientset, labelSelector, namespace)
-	if err != nil {
-		return nil, err
-	}
-
-	evMap := make(map[string]*eventSetInfo)
-	for _, ev := range eventList.Items {
-		name, ok := ev.Labels["evName"]
-		if !ok {
-			continue
+	var continueToken string
+	for {
+		eventList, err := clientset.CoreV1().Events(namespace).List(context.TODO(), metav1.ListOptions{
+			LabelSelector: labelSelector,
+			Limit:         limit,
+			Continue:      continueToken,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to list events: %v", err)
 		}
 
-		info, ok := evMap[name]
-		if !ok {
-			info = &eventSetInfo{
-				eventType: ev.Type,
-				reason:    ev.Reason,
+		for _, ev := range eventList.Items {
+			if err := fn(ev); err != nil {
+				return err
 			}
-			evMap[name] = info
 		}
-		info.total++
+
+		continueToken = eventList.Continue
+		if continueToken == "" {
+			break
+		}
 	}
-	return evMap, nil
+	return nil
 }

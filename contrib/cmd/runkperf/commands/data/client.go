@@ -5,9 +5,8 @@ package data
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
+	"math/rand"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -58,7 +57,7 @@ func PrepareNamespace(clientset *kubernetes.Clientset, namespace string) error {
 		if errors.IsAlreadyExists(err) {
 			return nil
 		}
-		return fmt.Errorf("failed to create namespace %s: %v", namespace, err)
+		return fmt.Errorf("failed to create namespace %s: %w", namespace, err)
 	}
 	return nil
 }
@@ -73,11 +72,7 @@ func RandBytes(n int) ([]byte, error) {
 
 	b := make([]byte, n)
 	for i := range b {
-		random, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
-		if err != nil {
-			return nil, fmt.Errorf("error generating random number: %w", err)
-		}
-		b[i] = byte(letterRunes[int(random.Int64())])
+		b[i] = byte(letterRunes[rand.Intn(len(letterRunes))])
 	}
 	return b, nil
 }
