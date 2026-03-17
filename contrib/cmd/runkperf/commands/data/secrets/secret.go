@@ -5,9 +5,7 @@ package secrets
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -222,24 +220,6 @@ func checkSecretParams(size int, groupSize int, total int) error {
 	return nil
 }
 
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
-func randBytes(n int) ([]byte, error) {
-	if n <= 0 {
-		return nil, fmt.Errorf("length must be positive")
-	}
-
-	b := make([]byte, n)
-	for i := range b {
-		random, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
-		if err != nil {
-			return nil, fmt.Errorf("error generating random number: %w", err)
-		}
-		b[i] = byte(letterRunes[int(random.Int64())])
-	}
-	return b, nil
-}
-
 func createSecrets(clientset *kubernetes.Clientset, namespace string, secName string, size int, groupSize int, total int) error {
 	for i := 0; i < total; i += groupSize {
 		ownerID := i
@@ -249,7 +229,7 @@ func createSecrets(clientset *kubernetes.Clientset, namespace string, secName st
 			g.Go(func() error {
 				name := fmt.Sprintf("%s-sec-%s-%d", appLabel, secName, idx)
 
-				data, err := randBytes(size)
+				randData, err := data.RandBytes(size)
 				if err != nil {
 					return fmt.Errorf("failed to generate random data for secret %s: %v", name, err)
 				}
@@ -265,7 +245,7 @@ func createSecrets(clientset *kubernetes.Clientset, namespace string, secName st
 					},
 					Type: corev1.SecretTypeOpaque,
 					Data: map[string][]byte{
-						"data": data,
+						"data": randData,
 					},
 				}
 

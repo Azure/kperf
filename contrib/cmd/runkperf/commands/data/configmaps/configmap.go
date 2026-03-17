@@ -5,10 +5,8 @@ package configmaps
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"math"
-	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -31,7 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var appLebel = "runkperf"
+var appLabel = "runkperf"
 
 var Command = cli.Command{
 	Name:      "configmap",
@@ -222,12 +220,12 @@ var configmapListCommand = cli.Command{
 		// If args are provided, list all configmaps with the label app=runkperf and cmName in (args)
 		var labelSelector string
 		if cliCtx.NArg() == 0 {
-			labelSelector = fmt.Sprintf("app=%s", appLebel)
+			labelSelector = fmt.Sprintf("app=%s", appLabel)
 
 		} else {
 			args := cliCtx.Args()
 			namesStr := strings.Join(args, ",")
-			labelSelector = fmt.Sprintf("app=%s, cmName in (%s)", appLebel, namesStr)
+			labelSelector = fmt.Sprintf("app=%s, cmName in (%s)", appLabel, namesStr)
 		}
 		cmMap := make(map[string][]int)
 		err = listConfigmapsByName(clientset, labelSelector, namespace, cmMap)
@@ -318,24 +316,6 @@ func isRetriableError(err error) bool {
 		errors.IsServiceUnavailable(err)
 }
 
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
-func randString(n int) (string, error) {
-	if n <= 0 {
-		return "", fmt.Errorf("length must be positive")
-	}
-
-	b := make([]rune, n)
-	for i := range b {
-		random, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
-		if err != nil {
-			return "", fmt.Errorf("error generating random number: %w", err)
-		}
-		b[i] = letterRunes[int(random.Int64())]
-	}
-	return string(b), nil
-}
-
 func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName string, size int, groupSize int, total int) error {
 	// Generate configmaps in parallel with fixed group size
 	// and random data
@@ -346,22 +326,22 @@ func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName 
 			g.Go(func() error {
 				cli := clientset.CoreV1().ConfigMaps(namespace)
 
-				name := fmt.Sprintf("%s-cm-%s-%d", appLebel, cmName, j)
+				name := fmt.Sprintf("%s-cm-%s-%d", appLabel, cmName, j)
 
 				cm := &corev1.ConfigMap{}
 				cm.Name = name
 				// Set the labels for the configmap to easily identify in delete or list commands
 				cm.Labels = map[string]string{
 					"ownerID": strconv.Itoa(ownerID),
-					"app":     appLebel,
+					"app":     appLabel,
 					"cmName":  cmName,
 				}
-				data, err := randString(size)
+				randData, err := data.RandString(size)
 				if err != nil {
 					return fmt.Errorf("failed to generate random string for configmap %s: %v", name, err)
 				}
 				cm.Data = map[string]string{
-					"data": data,
+					"data": randData,
 				}
 
 				err = retryOnTransient(func() error {
