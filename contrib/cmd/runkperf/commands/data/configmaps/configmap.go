@@ -111,7 +111,7 @@ var configmapAddCommand = cli.Command{
 			return err
 		}
 
-		err = prepareNamespace(clientset, namespace)
+		err = data.PrepareNamespace(clientset, namespace)
 		if err != nil {
 			return err
 		}
@@ -211,30 +211,6 @@ var configmapListCommand = cli.Command{
 		}
 		return tw.Flush()
 	},
-}
-
-func prepareNamespace(clientset *kubernetes.Clientset, namespace string) error {
-	if namespace == "" {
-		return fmt.Errorf("namespace cannot be empty")
-	}
-
-	if namespace == "default" {
-		return nil
-	}
-
-	_, err := clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		// If the namespace already exists, ignore the error
-		if errors.IsAlreadyExists(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to create namespace %s: %v", namespace, err)
-	}
-	return nil
 }
 
 func checkConfigmapParams(size int, groupSize int, total int) error {

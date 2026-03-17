@@ -11,8 +11,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/flowcontrol"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
 
 	"github.com/urfave/cli"
 
@@ -76,12 +75,12 @@ var daemonsetAddCommand = cli.Command{
 			return fmt.Errorf("count must be greater than 0")
 		}
 
-		err := prepareNamespace(kubeCfgPath, namespace)
+		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, 30, 10)
 		if err != nil {
 			return err
 		}
 
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		err = data.PrepareNamespace(clientset, namespace)
 		if err != nil {
 			return err
 		}
@@ -113,7 +112,7 @@ var daemonsetDelCommand = cli.Command{
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
 
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, 30, 10)
 		if err != nil {
 			return err
 		}
@@ -139,7 +138,7 @@ var daemonsetListCommand = cli.Command{
 	Action: func(cliCtx *cli.Context) error {
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
+		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, 30, 10)
 		if err != nil {
 			return err
 		}
@@ -190,50 +189,6 @@ var daemonsetListCommand = cli.Command{
 		}
 		return tw.Flush()
 	},
-}
-
-func prepareNamespace(kubeCfgPath string, namespace string) error {
-	if namespace == "" {
-		return fmt.Errorf("namespace cannot be empty")
-	}
-
-	if namespace == "default" {
-		return nil
-	}
-
-	clientset, err := newClientsetWithRateLimiter(kubeCfgPath, 30, 10)
-	if err != nil {
-		return err
-	}
-
-	_, err = clientset.CoreV1().Namespaces().Create(context.TODO(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespace,
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		// If the namespace already exists, ignore the error
-		if errors.IsAlreadyExists(err) {
-			return nil
-		}
-		return fmt.Errorf("failed to create namespace %s: %v", namespace, err)
-	}
-	return nil
-}
-
-func newClientsetWithRateLimiter(kubeCfgPath string, qps float32, burst int) (*kubernetes.Clientset, error) {
-	config, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
-	if err != nil {
-		return nil, err
-	}
-
-	config.QPS = qps
-	config.RateLimiter = flowcontrol.NewTokenBucketRateLimiter(qps, burst)
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-	return clientset, nil
 }
 
 func createDaemonsets(clientset *kubernetes.Clientset, namespace string, dsName string, count int) error {
