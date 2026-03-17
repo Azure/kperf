@@ -72,7 +72,7 @@ func RandBytes(n int) ([]byte, error) {
 
 	b := make([]byte, n)
 	for i := range b {
-		b[i] = byte(letterRunes[rand.Intn(len(letterRunes))])
+		b[i] = byte(letterRunes[rand.Intn(len(letterRunes))]) //nolint:gosec // G404: intentionally using math/rand for benchmark data, cryptographic randomness not needed
 	}
 	return b, nil
 }
