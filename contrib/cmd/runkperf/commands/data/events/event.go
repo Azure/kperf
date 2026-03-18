@@ -197,6 +197,9 @@ var eventDelCommand = cli.Command{
 		qps := float32(cliCtx.Float64("qps"))
 		burst := cliCtx.Int("burst")
 		groupSize := cliCtx.Int("group-size")
+		if groupSize <= 0 {
+			return fmt.Errorf("group-size must be greater than 0")
+		}
 		labelSelector := fmt.Sprintf("app=%s,eventSetName=%s", appLabel, eventSetName)
 
 		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)

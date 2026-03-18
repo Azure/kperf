@@ -121,7 +121,7 @@ var secretAddCommand = cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("Created secret %s with size %d B, group-size %d, total %d\n", secName, size, groupSize, total)
+		fmt.Printf("Created secret set %s with size %d B, group-size %d, total %d\n", secName, size, groupSize, total)
 		return nil
 	},
 }
@@ -162,6 +162,9 @@ var secretDelCommand = cli.Command{
 		qps := float32(cliCtx.Float64("qps"))
 		burst := cliCtx.Int("burst")
 		groupSize := cliCtx.Int("group-size")
+		if groupSize <= 0 {
+			return fmt.Errorf("group-size must be greater than 0")
+		}
 		labelSelector := fmt.Sprintf("app=%s,secName=%s", appLabel, secName)
 
 		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
@@ -247,11 +250,12 @@ var secretListCommand = cli.Command{
 		}
 
 		for name, info := range secMap {
-			// Determine group size from the first ownerID group count
+			// Group size should be the max count across all ownerID groups
 			groupSize := 0
 			for _, count := range info.ownerID {
-				groupSize = count
-				break
+				if count > groupSize {
+					groupSize = count
+				}
 			}
 			fmt.Fprintf(tw, "%s\t%d\t%d\t%d\n",
 				name,
