@@ -27,7 +27,7 @@ import (
 var appLabel = "runkperf"
 
 // defaultBatchSize is the number of secrets to list or delete per batch.
-// It is used as the page size for paginated API calls and the concurrency limit for parallel deletions.
+// It is used as the page size for paginated API calls.
 const defaultBatchSize int64 = 300
 
 var Command = cli.Command{
