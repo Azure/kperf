@@ -24,8 +24,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var appLabel = "runkperf"
-
 // defaultBatchSize is the number of secrets to list or delete per batch.
 // It is used as the page size for paginated API calls.
 const defaultBatchSize int64 = 300
@@ -165,7 +163,7 @@ var secretDelCommand = cli.Command{
 		if groupSize <= 0 {
 			return fmt.Errorf("group-size must be greater than 0")
 		}
-		labelSelector := fmt.Sprintf("app=%s,secName=%s", appLabel, secName)
+		labelSelector := fmt.Sprintf("app=%s,secName=%s", data.AppLabel, secName)
 
 		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
@@ -206,11 +204,11 @@ var secretListCommand = cli.Command{
 
 		var labelSelector string
 		if cliCtx.NArg() == 0 {
-			labelSelector = fmt.Sprintf("app=%s", appLabel)
+			labelSelector = fmt.Sprintf("app=%s", data.AppLabel)
 		} else {
 			args := cliCtx.Args()
 			namesStr := strings.Join(args, ",")
-			labelSelector = fmt.Sprintf("app=%s, secName in (%s)", appLabel, namesStr)
+			labelSelector = fmt.Sprintf("app=%s, secName in (%s)", data.AppLabel, namesStr)
 		}
 
 		type secretSetInfo struct {
@@ -291,7 +289,7 @@ func createSecrets(clientset *kubernetes.Clientset, namespace string, secName st
 		for j := i; j < i+groupSize && j < total; j++ {
 			idx := j
 			g.Go(func() error {
-				name := fmt.Sprintf("%s-sec-%s-%d", appLabel, secName, idx)
+				name := fmt.Sprintf("%s-sec-%s-%d", data.AppLabel, secName, idx)
 
 				randData, err := data.RandBytes(size)
 				if err != nil {
@@ -303,7 +301,7 @@ func createSecrets(clientset *kubernetes.Clientset, namespace string, secName st
 						Name: name,
 						Labels: map[string]string{
 							"ownerID": strconv.Itoa(ownerID),
-							"app":     appLabel,
+							"app":     data.AppLabel,
 							"secName": secName,
 						},
 					},

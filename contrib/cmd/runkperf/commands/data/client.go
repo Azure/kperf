@@ -16,6 +16,9 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 )
 
+// default label value used to identify resources created by runkperf.
+const AppLabel = "runkperf"
+
 // NewClientset creates a Kubernetes clientset with default rate limiting.
 func NewClientset(kubeCfgPath string) (*kubernetes.Clientset, error) {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeCfgPath)
