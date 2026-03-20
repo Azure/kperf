@@ -36,7 +36,7 @@ var Command = cli.Command{
 		},
 		cli.StringFlag{
 			Name:  "namespace",
-			Usage: "Namespace to use with commands. If the namespace does not exist, it will be created.",
+			Usage: "Namespace to use with commands. If the namespace does not exist, it will be created when executing add subcommand",
 			Value: "default",
 		},
 	},
