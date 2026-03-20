@@ -24,8 +24,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var appLabel = "runkperf"
-
 // defaultBatchSize is the number of events to list or delete per batch.
 // It is used as the page size for paginated API calls.
 const defaultBatchSize int64 = 300
@@ -200,7 +198,7 @@ var eventDelCommand = cli.Command{
 		if groupSize <= 0 {
 			return fmt.Errorf("group-size must be greater than 0")
 		}
-		labelSelector := fmt.Sprintf("app=%s,eventSetName=%s", appLabel, eventSetName)
+		labelSelector := fmt.Sprintf("app=%s,eventSetName=%s", data.AppLabel, eventSetName)
 
 		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
@@ -241,11 +239,11 @@ var eventListCommand = cli.Command{
 
 		var labelSelector string
 		if cliCtx.NArg() == 0 {
-			labelSelector = fmt.Sprintf("app=%s", appLabel)
+			labelSelector = fmt.Sprintf("app=%s", data.AppLabel)
 		} else {
 			args := cliCtx.Args()
 			namesStr := strings.Join(args, ",")
-			labelSelector = fmt.Sprintf("app=%s, eventSetName in (%s)", appLabel, namesStr)
+			labelSelector = fmt.Sprintf("app=%s, eventSetName in (%s)", data.AppLabel, namesStr)
 		}
 
 		evMap := make(map[string]*eventSetInfo)
@@ -296,7 +294,7 @@ func createEvents(clientset *kubernetes.Clientset, namespace, eventSetName strin
 		for j := i; j < i+groupSize && j < total; j++ {
 			idx := j
 			g.Go(func() error {
-				name := fmt.Sprintf("%s-ev-%s-%d", appLabel, eventSetName, idx)
+				name := fmt.Sprintf("%s-ev-%s-%d", data.AppLabel, eventSetName, idx)
 
 				message, err := data.RandString(messageSize)
 				if err != nil {
@@ -313,7 +311,7 @@ func createEvents(clientset *kubernetes.Clientset, namespace, eventSetName strin
 						Name:      name,
 						Namespace: namespace,
 						Labels: map[string]string{
-							"app":          appLabel,
+							"app":          data.AppLabel,
 							"eventSetName": eventSetName,
 						},
 					},

@@ -24,8 +24,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var appLabel = "runkperf"
-
 var Command = cli.Command{
 	Name:      "configmap",
 	ShortName: "cm",
@@ -139,7 +137,7 @@ var configmapDelCommand = cli.Command{
 
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		labelSelector := fmt.Sprintf("app=%s,cmName=%s", appLabel, cmName)
+		labelSelector := fmt.Sprintf("app=%s,cmName=%s", data.AppLabel, cmName)
 
 		clientset, err := data.NewClientset(kubeCfgPath)
 		if err != nil {
@@ -185,12 +183,12 @@ var configmapListCommand = cli.Command{
 		// If args are provided, list all configmaps with the label app=runkperf and cmName in (args)
 		var labelSelector string
 		if cliCtx.NArg() == 0 {
-			labelSelector = fmt.Sprintf("app=%s", appLabel)
+			labelSelector = fmt.Sprintf("app=%s", data.AppLabel)
 
 		} else {
 			args := cliCtx.Args()
 			namesStr := strings.Join(args, ",")
-			labelSelector = fmt.Sprintf("app=%s, cmName in (%s)", appLabel, namesStr)
+			labelSelector = fmt.Sprintf("app=%s, cmName in (%s)", data.AppLabel, namesStr)
 		}
 		cmMap := make(map[string][]int)
 		err = listConfigmapsByName(clientset, labelSelector, namespace, cmMap)
@@ -237,14 +235,14 @@ func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName 
 			g.Go(func() error {
 				cli := clientset.CoreV1().ConfigMaps(namespace)
 
-				name := fmt.Sprintf("%s-cm-%s-%d", appLabel, cmName, j)
+				name := fmt.Sprintf("%s-cm-%s-%d", data.AppLabel, cmName, j)
 
 				cm := &corev1.ConfigMap{}
 				cm.Name = name
 				// Set the labels for the configmap to easily identify in delete or list commands
 				cm.Labels = map[string]string{
 					"ownerID": strconv.Itoa(ownerID),
-					"app":     appLabel,
+					"app":     data.AppLabel,
 					"cmName":  cmName,
 				}
 				randData, err := data.RandString(size)
