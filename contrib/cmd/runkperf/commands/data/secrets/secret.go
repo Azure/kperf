@@ -238,7 +238,7 @@ var secretListCommand = cli.Command{
 
 			ownerID, ok := sec.Labels["ownerID"]
 			if !ok {
-				return fmt.Errorf("failed to find the ownerID of secret %s", name)
+				return fmt.Errorf("failed to find the ownerID of secret %s", sec.Name)
 			}
 			info.ownerID[ownerID]++
 			return nil
