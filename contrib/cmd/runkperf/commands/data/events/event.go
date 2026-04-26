@@ -77,7 +77,7 @@ var eventAddCommand = cli.Command{
 			Value: "Normal",
 		},
 		cli.IntFlag{
-			Name:  "message-size",
+			Name:  "size",
 			Usage: "The size of the event message in bytes (default targets ~5KB total event size; k8s metadata overhead is ~500-700 bytes)",
 			Value: 5000,
 		},
@@ -117,7 +117,7 @@ var eventAddCommand = cli.Command{
 		groupSize := cliCtx.Int("group-size")
 		reason := cliCtx.String("reason")
 		eventType := cliCtx.String("type")
-		messageSize := cliCtx.Int("message-size")
+		messageSize := cliCtx.Int("size")
 		involvedObjectKind := cliCtx.String("involved-object-kind")
 		involvedObjectName := cliCtx.String("involved-object-name")
 		qps := float32(cliCtx.Float64("qps"))
@@ -136,7 +136,7 @@ var eventAddCommand = cli.Command{
 			return fmt.Errorf("type must be either Normal or Warning")
 		}
 		if messageSize <= 0 {
-			return fmt.Errorf("message-size must be greater than 0")
+			return fmt.Errorf("size must be greater than 0")
 		}
 
 		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
