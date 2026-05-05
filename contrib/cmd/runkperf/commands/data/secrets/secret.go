@@ -276,9 +276,6 @@ func checkSecretParams(size int, groupSize int, total int) error {
 	if total <= 0 {
 		return fmt.Errorf("total amount must be greater than 0")
 	}
-	if groupSize > total {
-		return fmt.Errorf("group-size must be less than or equal to total")
-	}
 	return nil
 }
 
