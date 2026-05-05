@@ -129,9 +129,6 @@ var eventAddCommand = cli.Command{
 		if groupSize <= 0 {
 			return fmt.Errorf("group-size must be greater than 0")
 		}
-		if groupSize > total {
-			return fmt.Errorf("group-size must be less than or equal to total")
-		}
 		if eventType != "Normal" && eventType != "Warning" {
 			return fmt.Errorf("type must be either Normal or Warning")
 		}
