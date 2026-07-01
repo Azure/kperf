@@ -6,6 +6,7 @@ package request
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sync"
@@ -64,8 +65,10 @@ func NewWeightedRandomRequests(spec *types.LoadProfileSpec) (*WeightedRandomRequ
 			builder = newRequestPatchBuilder(r.Patch, "", spec.MaxRetries)
 		case r.PostDel != nil:
 			builder = newRequestPostDelBuilder(r.PostDel, "", spec.MaxRetries)
+		case r.Put != nil:
+			builder = newRequestPutBuilder(r.Put, spec.MaxRetries)
 		default:
-			return nil, fmt.Errorf("not implement for PUT yet")
+			return nil, fmt.Errorf("unknown request type: %+v", r)
 		}
 		reqBuilders = append(reqBuilders, builder)
 	}
@@ -429,6 +432,7 @@ type requestPostDelBuilder struct {
 	resourceVersion string
 	namespace       string
 	deleteRatio     float64
+	payloadSize     int
 	maxRetries      int
 
 	// Per-builder cache for created resources
@@ -445,6 +449,7 @@ func newRequestPostDelBuilder(src *types.RequestPostDel, resourceVersion string,
 		resourceVersion: resourceVersion,
 		namespace:       src.Namespace,
 		deleteRatio:     src.DeleteRatio,
+		payloadSize:     src.PayloadSize,
 		maxRetries:      maxRetries,
 		cache:           InitCache(), // Initialize the cache
 	}
@@ -498,6 +503,7 @@ func (b *requestPostDelBuilder) Build(cli rest.Interface) Requester {
 	body, _ := utils.RenderTemplate(b.resource, map[string]interface{}{
 		"namePattern": name,
 		"namespace":   b.namespace,
+		"payload":     randomPayload(b.payloadSize),
 	})
 
 	return &PostDelDiscardRequester{
@@ -544,4 +550,82 @@ func (reqr *PostDelDiscardRequester) Do(ctx context.Context) (bytes int64, err e
 
 func toPtr[T any](v T) *T {
 	return &v
+}
+
+// requestPutBuilder builds PUT requests that overwrite an existing ConfigMap
+// named `<name>-<rand[0, keySpaceSize)>` with a body whose `data.payload` field
+// carries `payloadSize` random bytes. The target ConfigMap must already exist
+// (e.g. created via `runkperf data cm add`); otherwise the apiserver returns
+// 404 and the request is counted as a failure. Only `configmaps` is supported
+// today — see RequestPut.Validate.
+type requestPutBuilder struct {
+	version      schema.GroupVersion
+	resource     string
+	namespace    string
+	name         string
+	keySpaceSize int
+	payloadSize  int
+	maxRetries   int
+}
+
+func newRequestPutBuilder(src *types.RequestPut, maxRetries int) *requestPutBuilder {
+	return &requestPutBuilder{
+		version: schema.GroupVersion{
+			Group:   src.Group,
+			Version: src.Version,
+		},
+		resource:     src.Resource,
+		namespace:    src.Namespace,
+		name:         src.Name,
+		keySpaceSize: src.KeySpaceSize,
+		payloadSize:  src.PayloadSize,
+		maxRetries:   maxRetries,
+	}
+}
+
+// Build implements RESTRequestBuilder.Build.
+func (b *requestPutBuilder) Build(cli rest.Interface) Requester {
+	comps := []string{"api", b.version.Version, "namespaces", b.namespace, b.resource}
+
+	randomInt, _ := rand.Int(rand.Reader, big.NewInt(int64(b.keySpaceSize)))
+	finalName := fmt.Sprintf("%s-%d", b.name, randomInt.Int64())
+	comps = append(comps, finalName)
+
+	cm := &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      finalName,
+			Namespace: b.namespace,
+		},
+		Data: map[string]string{"payload": randomPayload(b.payloadSize)},
+	}
+	body, _ := json.Marshal(cm)
+
+	return &DiscardRequester{
+		BaseRequester: BaseRequester{
+			method: "PUT",
+			req:    cli.Put().AbsPath(comps...).Body(body).MaxRetries(b.maxRetries),
+		},
+	}
+}
+
+// randomPayload returns a string of exactly n bytes from a printable
+// alphabet, generated from crypto/rand. Returns "" when n <= 0.
+func randomPayload(n int) string {
+	if n <= 0 {
+		return ""
+	}
+	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	raw := make([]byte, n)
+	if _, err := rand.Read(raw); err != nil {
+		// crypto/rand should not fail; fall back to a single repeated byte
+		for i := range raw {
+			raw[i] = 'x'
+		}
+		return string(raw)
+	}
+	for i, b := range raw {
+		raw[i] = alphabet[int(b)%len(alphabet)]
+	}
+	return string(raw)
 }
