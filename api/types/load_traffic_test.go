@@ -59,7 +59,7 @@ specs:
           namespace: kperf
           name: kperf-
           keySpaceSize: 1000
-          valueSize: 1024
+          payloadSize: 1024
         shares: 1000
       - getPodLog:
           namespace: default
@@ -119,7 +119,7 @@ specs:
 	assert.Equal(t, "kperf", target.Specs[0].Requests[4].Put.Namespace)
 	assert.Equal(t, "kperf-", target.Specs[0].Requests[4].Put.Name)
 	assert.Equal(t, 1000, target.Specs[0].Requests[4].Put.KeySpaceSize)
-	assert.Equal(t, 1024, target.Specs[0].Requests[4].Put.ValueSize)
+	assert.Equal(t, 1024, target.Specs[0].Requests[4].Put.PayloadSize)
 
 	assert.Equal(t, 10, target.Specs[0].Requests[5].Shares)
 	assert.NotNil(t, target.Specs[0].Requests[5].GetPodLog)

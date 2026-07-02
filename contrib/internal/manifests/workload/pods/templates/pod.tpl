@@ -1,5 +1,6 @@
 {{- $name:= .Values.namePattern }}
 {{- $namespace:= .Values.namespace }}
+{{- $payload:= .Values.payload }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -11,3 +12,6 @@ spec:
   containers:
     - name: fake-container
       image: fake-image
+      env:
+        - name: PAYLOAD
+          value: {{ $payload | quote }}

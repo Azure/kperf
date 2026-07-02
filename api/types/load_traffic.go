@@ -137,14 +137,15 @@ type RequestWatchList struct {
 }
 
 // RequestPut defines PUT request for target resource type.
+//
+// NOTE: Today only `configmaps` (core/v1) is supported. The PUT builder
+// constructs a ConfigMap body inline (`data.payload = <PayloadSize random
+// bytes>`) and overwrites an existing object named `<Name>-<rand[0,
+// KeySpaceSize)>`. The target objects must be pre-populated (e.g. via
+// `runkperf data cm add`); a request against a non-existent object will
+// receive a 404 from the apiserver and be counted as a failure.
 type RequestPut struct {
 	// KubeGroupVersionResource identifies the resource URI.
-	//
-	// NOTE: Currently, it should be configmap or secrets because we can
-	// generate random bytes as blob for it. However, for the pod resource,
-	// we need to ensure a lot of things are ready, for instance, volumes,
-	// resource capacity. It's not easy to generate it randomly. Maybe we
-	// can introduce pod template in the future.
 	KubeGroupVersionResource `yaml:",inline"`
 	// Namespace is object's namespace.
 	Namespace string `json:"namespace" yaml:"namespace"`
@@ -152,8 +153,9 @@ type RequestPut struct {
 	Name string `json:"name" yaml:"name"`
 	// KeySpaceSize is used to generate random number as name's suffix.
 	KeySpaceSize int `json:"keySpaceSize" yaml:"keySpaceSize"`
-	// ValueSize is the object's size in bytes.
-	ValueSize int `json:"valueSize" yaml:"valueSize"`
+	// PayloadSize is the size in bytes of a random string written into the
+	// ConfigMap body's `data.payload` field.
+	PayloadSize int `json:"payloadSize" yaml:"payloadSize"`
 }
 
 // RequestPatch defines PATCH request for target resource type.
@@ -191,6 +193,9 @@ type RequestPostDel struct {
 	KubeGroupVersionResource `yaml:",inline"`
 	Namespace                string  `json:"namespace" yaml:"namespace"`
 	DeleteRatio              float64 `json:"deleteRatio" yaml:"deleteRatio"`
+	// PayloadSize is the size in bytes of a random padding string injected
+	// into the created object (e.g. as a Pod env var value). 0 means no padding.
+	PayloadSize int `json:"payloadSize" yaml:"payloadSize"`
 }
 
 // Validate verifies fields of LoadProfile.
@@ -316,15 +321,20 @@ func (r *RequestPut) Validate() error {
 		return fmt.Errorf("kube metadata: %v", err)
 	}
 
-	// TODO: check resource type
+	// Only core/v1 ConfigMap is supported today (see RequestPut doc comment).
+	if (r.Group != "" && r.Group != "core") || r.Version != "v1" || r.Resource != "configmaps" {
+		return fmt.Errorf("put currently only supports core/v1 configmaps, got group=%q version=%q resource=%q",
+			r.Group, r.Version, r.Resource)
+	}
+
 	if r.Name == "" {
 		return fmt.Errorf("name pattern is required")
 	}
 	if r.KeySpaceSize <= 0 {
 		return fmt.Errorf("keySpaceSize must > 0")
 	}
-	if r.ValueSize <= 0 {
-		return fmt.Errorf("valueSize must > 0")
+	if r.PayloadSize <= 0 {
+		return fmt.Errorf("payloadSize must > 0")
 	}
 	return nil
 }
@@ -403,6 +413,10 @@ func (r *RequestPostDel) Validate() error {
 
 	if r.DeleteRatio < 0 || r.DeleteRatio > 0.5 {
 		return fmt.Errorf("delete ratio must be between 0 and 0.5: %v, create proportion should be greater than delete", r.DeleteRatio)
+	}
+
+	if r.PayloadSize < 0 {
+		return fmt.Errorf("payloadSize must >= 0: %v", r.PayloadSize)
 	}
 
 	return nil
