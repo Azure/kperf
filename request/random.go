@@ -609,23 +609,43 @@ func (b *requestPutBuilder) Build(cli rest.Interface) Requester {
 	}
 }
 
-// randomPayload returns a string of exactly n bytes from a printable
-// alphabet, generated from crypto/rand. Returns "" when n <= 0.
+// randomPayload returns a string of exactly n bytes, uniformly sampled from
+// [a-zA-Z0-9] via crypto/rand with rejection sampling to avoid modulo bias.
+// Returns "" when n <= 0.
 func randomPayload(n int) string {
 	if n <= 0 {
 		return ""
 	}
 	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	raw := make([]byte, n)
-	if _, err := rand.Read(raw); err != nil {
-		// crypto/rand should not fail; fall back to a single repeated byte
-		for i := range raw {
-			raw[i] = 'x'
+	// Only use byte values in [0, max). Since len(alphabet)=62 and
+	// 248 is the largest multiple of 62 below 256, mapping b%62 is uniform
+	// for accepted bytes. Bytes 248..255 are skipped to avoid modulo bias.
+	const max = byte(256 - 256%len(alphabet))
+
+	out := make([]byte, n)
+
+	bufSize := n
+	if bufSize > 4096 {
+		bufSize = 4096
+	}
+	buf := make([]byte, bufSize)
+
+	for i := 0; i < n; {
+		if _, err := rand.Read(buf); err != nil {
+			panic(fmt.Errorf("failed to read random bytes: %w", err))
 		}
-		return string(raw)
+
+		for _, b := range buf {
+			if b >= max {
+				continue
+			}
+			out[i] = alphabet[int(b)%len(alphabet)]
+			i++
+			if i == n {
+				return string(out)
+			}
+		}
 	}
-	for i, b := range raw {
-		raw[i] = alphabet[int(b)%len(alphabet)]
-	}
-	return string(raw)
+
+	return string(out)
 }
