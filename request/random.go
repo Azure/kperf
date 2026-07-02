@@ -617,10 +617,10 @@ func randomPayload(n int) string {
 		return ""
 	}
 	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	// Only use byte values in [0, max). Since len(alphabet)=62 and
+	// Only use byte values in [0, threshold). Since len(alphabet)=62 and
 	// 248 is the largest multiple of 62 below 256, mapping b%62 is uniform
 	// for accepted bytes. Bytes 248..255 are skipped to avoid modulo bias.
-	const max = byte(256 - 256%len(alphabet))
+	const threshold = byte(256 - 256%len(alphabet))
 
 	out := make([]byte, n)
 
@@ -636,7 +636,7 @@ func randomPayload(n int) string {
 		}
 
 		for _, b := range buf {
-			if b >= max {
+			if b >= threshold {
 				continue
 			}
 			out[i] = alphabet[int(b)%len(alphabet)]
