@@ -14,4 +14,4 @@ spec:
       image: fake-image
       env:
         - name: PAYLOAD
-          value: {{ $payload | quote }}
+          value: "{{ $payload }}"

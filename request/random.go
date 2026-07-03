@@ -500,11 +500,14 @@ func (b *requestPostDelBuilder) Build(cli rest.Interface) Requester {
 	timestamp := time.Now().UnixNano()
 	name := fmt.Sprintf("%d-%d", timestamp, counter)
 
-	body, _ := utils.RenderTemplate(b.resource, map[string]interface{}{
+	body, err := utils.RenderTemplate(b.resource, map[string]interface{}{
 		"namePattern": name,
 		"namespace":   b.namespace,
 		"payload":     randomPayload(b.payloadSize),
 	})
+	if err != nil {
+		panic(fmt.Errorf("failed to render %s template: %w", b.resource, err))
+	}
 
 	return &PostDelDiscardRequester{
 		builder:   b,
