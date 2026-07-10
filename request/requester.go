@@ -39,13 +39,13 @@ func (reqr *BaseRequester) URL() *url.URL {
 	return reqr.req.URL()
 }
 
-// MaskedURL returns a masked URL for DELETE and PATCH methods to enable aggregation in metrics
+// MaskedURL returns a masked URL for DELETE, PATCH and PUT methods to enable aggregation in metrics.
 func (reqr *BaseRequester) MaskedURL() *url.URL {
 	originalURL := reqr.req.URL()
 
-	// Aggregates for DELETE and PATCH methods, replaces the last path segment
-	// for DELETE and PATCH requests so they can be aggregated (e.g. in metrics)
-	if reqr.method == http.MethodDelete || reqr.method == http.MethodPatch {
+	// Aggregates for DELETE, PATCH and PUT methods, replaces the last path segment
+	// for DELETE, PATCH and PUT requests so they can be aggregated (e.g. in metrics)
+	if reqr.method == http.MethodDelete || reqr.method == http.MethodPatch || reqr.method == http.MethodPut {
 		if u, err := url.Parse(originalURL.String()); err == nil {
 			u.Path = path.Join(path.Dir(u.Path), ":name")
 			return u // String() will keep ":name" as-is
