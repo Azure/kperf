@@ -32,3 +32,6 @@ tmp/
 
 # VSCode settings
 .vscode/
+
+# Claude Code
+.claude/

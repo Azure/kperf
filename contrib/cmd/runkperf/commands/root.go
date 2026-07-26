@@ -13,6 +13,8 @@ import (
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/configmaps"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/daemonsets"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/events"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/secrets"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/warmup"
 
 	"github.com/urfave/cli"
@@ -23,6 +25,8 @@ func init() {
 	data.RegisterSubcommands(
 		configmaps.Command,
 		daemonsets.Command,
+		events.Command,
+		secrets.Command,
 	)
 }
 
