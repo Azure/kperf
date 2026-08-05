@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"text/tabwriter"
 
 	"golang.org/x/sync/errgroup"
@@ -130,6 +131,28 @@ var configmapDelCommand = cli.Command{
 	ShortName: "del",
 	ArgsUsage: "NAME",
 	Usage:     "Delete a configmaps set",
+	Flags: []cli.Flag{
+		cli.Float64Flag{
+			Name:  "qps",
+			Usage: "QPS for the Kubernetes client rate limiter to control configmap delete operations",
+			Value: 3000,
+		},
+		cli.IntFlag{
+			Name:  "burst",
+			Usage: "Burst for the Kubernetes client rate limiter to control configmap delete operations",
+			Value: 3000,
+		},
+		cli.IntFlag{
+			Name:  "batch",
+			Usage: "Number of concurrent delete requests per batch",
+			Value: 3000,
+		},
+		cli.IntFlag{
+			Name:  "total",
+			Usage: "Maximum number of configmaps to delete. Names are reconstructed as <name>-<0..total-1>; deletion stops early when a name is not found.",
+			Value: 0,
+		},
+	},
 	Action: func(cliCtx *cli.Context) error {
 		if cliCtx.NArg() != 1 {
 			return fmt.Errorf("required only one configmaps set name")
@@ -141,20 +164,28 @@ var configmapDelCommand = cli.Command{
 
 		namespace := cliCtx.GlobalString("namespace")
 		kubeCfgPath := cliCtx.GlobalString("kubeconfig")
-		labelSelector := fmt.Sprintf("app=%s,cmName=%s", appLebel, cmName)
+		qps := float32(cliCtx.Float64("qps"))
+		burst := cliCtx.Int("burst")
+		batch := cliCtx.Int("batch")
+		if batch <= 0 {
+			return fmt.Errorf("batch must be greater than 0")
+		}
+		total := cliCtx.Int("total")
+		if total <= 0 {
+			return fmt.Errorf("total must be greater than 0")
+		}
 
-		clientset, err := data.NewClientset(kubeCfgPath)
+		clientset, err := data.NewClientsetWithRateLimiter(kubeCfgPath, qps, burst)
 		if err != nil {
 			return err
 		}
 
-		// Delete each configmap
-		err = deleteConfigmaps(clientset, labelSelector, namespace)
+		deleted, err := deleteConfigmapsByName(clientset, namespace, cmName, total, batch)
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("Deleted configmap %s in %s namespace\n", cmName, namespace)
+		fmt.Printf("Deleted %d configmap(s) for set %q in namespace %s\n", deleted, cmName, namespace)
 		return nil
 
 	},
@@ -217,7 +248,7 @@ func prepareNamespace(clientset *kubernetes.Clientset, namespace string) error {
 	if namespace == "" {
 		return fmt.Errorf("namespace cannot be empty")
 	}
-
+ 
 	if namespace == "default" {
 		return nil
 	}
@@ -313,36 +344,51 @@ func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName 
 	return nil
 }
 
-func deleteConfigmaps(clientset *kubernetes.Clientset, labelSelector string, namespace string) error {
-	// List all configmaps with the label selector
-	configMaps, err := listConfigmaps(clientset, labelSelector, namespace)
-	if err != nil {
-		return err
-	}
+// deleteConfigmapsByName deletes a configmap set by reconstructing the
+// deterministic names that `add` generates (%s-cm-%s-%d), in `batch`-sized
+// concurrent waves. No List call is issued.
+//
+// It deletes at most total indices and stops as soon as a batch contains a
+// NotFound response. Assumes indices are contiguous from 0.
+//
+// Returns the number of successfully deleted configmaps.
+func deleteConfigmapsByName(clientset *kubernetes.Clientset, namespace, cmName string, total, batch int) (int, error) {
+	cmClient := clientset.CoreV1().ConfigMaps(namespace)
 
-	if len(configMaps.Items) == 0 {
-		return fmt.Errorf("no configmaps set found in namespace: %s", namespace)
-	}
-	// Delete each configmap in parallel with fixed group size
-	n, batch := len(configMaps.Items), 300
-	for i := 0; i < n; i = i + batch {
+	totalDeleted := 0
+	for start := 0; start < total; start += batch {
+		end := start + batch
+		if end > total {
+			end = total
+		}
+
+		var succeeded int64
 		g := new(errgroup.Group)
-		for j := i; j < i+batch && j < n; j++ {
+		for j := start; j < end; j++ {
+			name := fmt.Sprintf("%s-cm-%s-%d", appLebel, cmName, j)
 			g.Go(func() error {
-				err := clientset.CoreV1().ConfigMaps(namespace).Delete(context.TODO(), configMaps.Items[j].Name, metav1.DeleteOptions{})
-				if err != nil && !errors.IsNotFound(err) {
-					// Ignore not found errors
-					return fmt.Errorf("failed to delete configmap %s: %v", configMaps.Items[j].Name, err)
+				err := cmClient.Delete(context.TODO(), name, metav1.DeleteOptions{})
+				if err != nil {
+					if errors.IsNotFound(err) {
+						return nil
+					}
+					return fmt.Errorf("failed to delete configmap %s: %v", name, err)
 				}
+				atomic.AddInt64(&succeeded, 1)
 				return nil
 			})
 		}
-
 		if err := g.Wait(); err != nil {
-			return err
+			return totalDeleted, err
+		}
+		totalDeleted += int(succeeded)
+
+		// Fewer successes than requests means this batch reached a NotFound entry.
+		if int(succeeded) < end-start {
+			return totalDeleted, nil
 		}
 	}
-	return nil
+	return totalDeleted, nil
 }
 
 func listConfigmaps(clientset *kubernetes.Clientset, labelSelector string, namespace string) (*corev1.ConfigMapList, error) {
