@@ -135,17 +135,17 @@ var configmapDelCommand = cli.Command{
 		cli.Float64Flag{
 			Name:  "qps",
 			Usage: "QPS for the Kubernetes client rate limiter to control configmap delete operations",
-			Value: 3000,
+			Value: 30,
 		},
 		cli.IntFlag{
 			Name:  "burst",
 			Usage: "Burst for the Kubernetes client rate limiter to control configmap delete operations",
-			Value: 3000,
+			Value: 10,
 		},
 		cli.IntFlag{
 			Name:  "batch",
 			Usage: "Number of concurrent delete requests per batch",
-			Value: 3000,
+			Value: 300,
 		},
 		cli.IntFlag{
 			Name:  "total",
@@ -248,7 +248,7 @@ func prepareNamespace(clientset *kubernetes.Clientset, namespace string) error {
 	if namespace == "" {
 		return fmt.Errorf("namespace cannot be empty")
 	}
- 
+
 	if namespace == "default" {
 		return nil
 	}
