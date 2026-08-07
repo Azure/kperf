@@ -356,7 +356,7 @@ func deleteConfigmapsByName(clientset *kubernetes.Clientset, namespace, cmName s
 	cmClient := clientset.CoreV1().ConfigMaps(namespace)
 
 	totalDeleted := 0
-	for start := 0; start < total; start += batch {
+	for start := 0; start < total && start == totalDeleted; start += batch {
 		end := start + batch
 		if end > total {
 			end = total
@@ -382,11 +382,6 @@ func deleteConfigmapsByName(clientset *kubernetes.Clientset, namespace, cmName s
 			return totalDeleted, err
 		}
 		totalDeleted += int(succeeded)
-
-		// Fewer successes than requests means this batch reached a NotFound entry.
-		if int(succeeded) < end-start {
-			return totalDeleted, nil
-		}
 	}
 	return totalDeleted, nil
 }
