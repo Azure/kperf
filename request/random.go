@@ -366,11 +366,9 @@ func (b *requestGetPodLogBuilder) Build(cli rest.Interface) Requester {
 	}
 }
 
-// patchRandomPlaceholder is a token that, when present in a patch body, is
+// When this placeholder is present in a patch body, it is
 // replaced on every request with a random string. This guarantees each patch
-// actually mutates the target object instead of re-applying identical data
-// (which the apiserver treats as a no-op that bumps no resourceVersion and
-// emits no watch event).
+// actually mutates the target object.
 const patchRandomPlaceholder = "{{.Random}}"
 
 type requestPatchBuilder struct {
@@ -386,8 +384,7 @@ type requestPatchBuilder struct {
 }
 
 // renderPatchBody replaces every occurrence of patchRandomPlaceholder in raw
-// with a random string. A body without the placeholder is returned unchanged
-// (backward compatible with existing profiles).
+// with a random string.
 func renderPatchBody(raw string) []byte {
 	if !strings.Contains(raw, patchRandomPlaceholder) {
 		return []byte(raw)
