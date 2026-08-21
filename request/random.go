@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -365,6 +366,13 @@ func (b *requestGetPodLogBuilder) Build(cli rest.Interface) Requester {
 	}
 }
 
+// patchRandomPlaceholder is a token that, when present in a patch body, is
+// replaced on every request with a random string. This guarantees each patch
+// actually mutates the target object instead of re-applying identical data
+// (which the apiserver treats as a no-op that bumps no resourceVersion and
+// emits no watch event).
+const patchRandomPlaceholder = "{{.Random}}"
+
 type requestPatchBuilder struct {
 	version         schema.GroupVersion
 	resource        string
@@ -373,8 +381,33 @@ type requestPatchBuilder struct {
 	name            string
 	keySpaceSize    int
 	patchType       apitypes.PatchType
-	body            interface{}
+	rawBody         string
 	maxRetries      int
+}
+
+// renderPatchBody replaces every occurrence of patchRandomPlaceholder in raw
+// with a random string. A body without the placeholder is returned unchanged
+// (backward compatible with existing profiles).
+func renderPatchBody(raw string) []byte {
+	if !strings.Contains(raw, patchRandomPlaceholder) {
+		return []byte(raw)
+	}
+	return []byte(strings.ReplaceAll(raw, patchRandomPlaceholder, randomString(8)))
+}
+
+// randomString returns a random lowercase string of length n, suitable for
+// making each rendered patch body unique.
+func randomString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyz"
+	b := make([]byte, n)
+	for i := range b {
+		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			panic(err)
+		}
+		b[i] = letters[idx.Int64()]
+	}
+	return string(b)
 }
 
 func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) *requestPatchBuilder {
@@ -391,7 +424,7 @@ func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, max
 		name:            src.Name,
 		keySpaceSize:    src.KeySpaceSize,
 		patchType:       patchType,
-		body:            []byte(src.Body),
+		rawBody:         src.Body,
 		maxRetries:      maxRetries,
 	}
 }
@@ -416,11 +449,15 @@ func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
 	finalName := fmt.Sprintf("%s-%d", b.name, suffix)
 	comps = append(comps, b.resource, finalName)
 
+	// Render a unique body per request if patchRandomPlaceholder exists. Bodies without the
+	// placeholder pass through unchanged.
+	reqBody := renderPatchBody(b.rawBody)
+
 	return &DiscardRequester{
 		BaseRequester: BaseRequester{
 			method: "PATCH",
 			req: cli.Patch(b.patchType).AbsPath(comps...).
-				Body(b.body).
+				Body(reqBody).
 				MaxRetries(b.maxRetries),
 		},
 	}
