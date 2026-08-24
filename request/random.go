@@ -379,7 +379,7 @@ type requestPatchBuilder struct {
 	name            string
 	keySpaceSize    int
 	patchType       apitypes.PatchType
-	rawBody         string
+	body            string
 	maxRetries      int
 }
 
@@ -406,7 +406,7 @@ func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, max
 		name:            src.Name,
 		keySpaceSize:    src.KeySpaceSize,
 		patchType:       patchType,
-		rawBody:         src.Body,
+		body:            src.Body,
 		maxRetries:      maxRetries,
 	}
 }
@@ -433,7 +433,7 @@ func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
 
 	// Render a unique body per request if patchRandomPlaceholder exists. Bodies without the
 	// placeholder pass through unchanged.
-	reqBody := renderPatchBody(b.rawBody)
+	reqBody := renderPatchBody(b.body)
 
 	return &DiscardRequester{
 		BaseRequester: BaseRequester{

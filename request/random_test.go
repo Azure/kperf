@@ -61,8 +61,8 @@ func TestRequestPatchBuilderRendersUniqueBodies(t *testing.T) {
 	}, "", 0)
 
 	// Each call renders a fresh random body, producing a distinct result.
-	first := string(renderPatchBody(b.rawBody))
-	second := string(renderPatchBody(b.rawBody))
+	first := string(renderPatchBody(b.body))
+	second := string(renderPatchBody(b.body))
 	assert.NotEqual(t, first, second)
 	assert.NotContains(t, first, patchRandomPlaceholder)
 	assert.NotContains(t, second, patchRandomPlaceholder)
@@ -91,7 +91,7 @@ func TestRequestPatchBuilderRendersConcurrencySafe(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < perGoroutine; j++ {
-				body := string(renderPatchBody(b.rawBody))
+				body := string(renderPatchBody(b.body))
 				assert.NotContains(t, body, patchRandomPlaceholder)
 				mu.Lock()
 				seen[body] = struct{}{}
