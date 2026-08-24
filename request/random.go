@@ -389,22 +389,7 @@ func renderPatchBody(raw string) []byte {
 	if !strings.Contains(raw, patchRandomPlaceholder) {
 		return []byte(raw)
 	}
-	return []byte(strings.ReplaceAll(raw, patchRandomPlaceholder, randomString(8)))
-}
-
-// randomString returns a random lowercase string of length n, suitable for
-// making each rendered patch body unique.
-func randomString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz"
-	b := make([]byte, n)
-	for i := range b {
-		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
-		if err != nil {
-			panic(err)
-		}
-		b[i] = letters[idx.Int64()]
-	}
-	return string(b)
+	return []byte(strings.ReplaceAll(raw, patchRandomPlaceholder, randomPayload(8)))
 }
 
 func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) *requestPatchBuilder {

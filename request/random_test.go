@@ -33,15 +33,18 @@ func TestRenderPatchBody(t *testing.T) {
 	assert.Equal(t, static, string(renderPatchBody(static)))
 }
 
-func TestRandomString(t *testing.T) {
+func TestRandomPayload(t *testing.T) {
 	const n = 8
-	s := randomString(n)
+	s := randomPayload(n)
 	assert.Len(t, s, n)
 	for _, r := range s {
-		assert.True(t, r >= 'a' && r <= 'z', "unexpected char %q", r)
+		isAlnum := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+		assert.True(t, isAlnum, "unexpected char %q", r)
 	}
+	// n <= 0 returns an empty string.
+	assert.Equal(t, "", randomPayload(0))
 	// Two calls should not collide.
-	assert.NotEqual(t, randomString(n), randomString(n))
+	assert.NotEqual(t, randomPayload(n), randomPayload(n))
 }
 
 func TestRequestPatchBuilderRendersUniqueBodies(t *testing.T) {
