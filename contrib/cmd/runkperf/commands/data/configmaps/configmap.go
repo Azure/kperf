@@ -65,7 +65,7 @@ var configmapAddCommand = cli.Command{
 		cli.IntFlag{
 			Name:  "group-size",
 			Usage: "The size of each configmap group",
-			Value: 30,
+			Value: 10,
 		},
 		cli.IntFlag{
 			Name:  "total",
@@ -150,7 +150,7 @@ var configmapDelCommand = cli.Command{
 		cli.IntFlag{
 			Name:  "total",
 			Usage: "Maximum number of configmaps to delete. Names are reconstructed as <name>-<0..total-1>; deletion stops early when a name is not found.",
-			Value: 0,
+			Value: 10,
 		},
 	},
 	Action: func(cliCtx *cli.Context) error {
