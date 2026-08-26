@@ -170,6 +170,13 @@ type RequestPatch struct {
 	// PatchType is the type of patch, e.g. "json", "merge", "strategic-merge".
 	PatchType string `json:"patchType" yaml:"patchType"`
 	// Body is the request body, for fields to be changed.
+	//
+	// The literal token "{{.Random}}" in Body is replaced on every request with
+	// a random string. Use it to guarantee each patch mutates the target object:
+	// re-applying identical data is a no-op that bumps no resourceVersion and
+	// emits no watch event, so a static body's event rate decays as objects
+	// converge. A Body without the token is sent unchanged.
+	// e.g. '{"metadata":{"labels":{"bench-tick":"{{.Random}}"}}}'.
 	Body string `json:"body" yaml:"body"`
 }
 

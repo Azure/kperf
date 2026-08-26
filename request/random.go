@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -365,6 +366,11 @@ func (b *requestGetPodLogBuilder) Build(cli rest.Interface) Requester {
 	}
 }
 
+// When this placeholder is present in a patch body, it is
+// replaced on every request with a random string. This guarantees each patch
+// actually mutates the target object.
+const patchRandomPlaceholder = "{{.Random}}"
+
 type requestPatchBuilder struct {
 	version         schema.GroupVersion
 	resource        string
@@ -373,8 +379,17 @@ type requestPatchBuilder struct {
 	name            string
 	keySpaceSize    int
 	patchType       apitypes.PatchType
-	body            interface{}
+	body            string
 	maxRetries      int
+}
+
+// renderPatchBody replaces every occurrence of patchRandomPlaceholder in raw
+// with a random string.
+func renderPatchBody(raw string) []byte {
+	if !strings.Contains(raw, patchRandomPlaceholder) {
+		return []byte(raw)
+	}
+	return []byte(strings.ReplaceAll(raw, patchRandomPlaceholder, randomPayload(8)))
 }
 
 func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) *requestPatchBuilder {
@@ -391,7 +406,7 @@ func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, max
 		name:            src.Name,
 		keySpaceSize:    src.KeySpaceSize,
 		patchType:       patchType,
-		body:            []byte(src.Body),
+		body:            src.Body,
 		maxRetries:      maxRetries,
 	}
 }
@@ -416,11 +431,15 @@ func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
 	finalName := fmt.Sprintf("%s-%d", b.name, suffix)
 	comps = append(comps, b.resource, finalName)
 
+	// Render a unique body per request if patchRandomPlaceholder exists. Bodies without the
+	// placeholder pass through unchanged.
+	reqBody := renderPatchBody(b.body)
+
 	return &DiscardRequester{
 		BaseRequester: BaseRequester{
 			method: "PATCH",
 			req: cli.Patch(b.patchType).AbsPath(comps...).
-				Body(b.body).
+				Body(reqBody).
 				MaxRetries(b.maxRetries),
 		},
 	}
