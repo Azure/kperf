@@ -7,12 +7,14 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"text/tabwriter"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -24,6 +26,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -284,6 +288,60 @@ func checkConfigmapParams(size int, groupSize int, total int) error {
 	return nil
 }
 
+// retryTimeout bounds how long a single request is retried on transient errors.
+const retryTimeout = 2 * time.Minute
+
+// retryOnTransient calls fn, retrying transient failures until retryTimeout
+// elapses.
+//
+// A transient network failure (e.g. a dropped connection) in the middle of a
+// large batch would otherwise abort the whole run and waste all prior work, so
+// each request is retried against a wall-clock budget instead of a fixed step
+// count. Backoff grows exponentially and is capped so a fresh connection is
+// attempted regularly while connectivity recovers.
+func retryOnTransient(fn func() error) error {
+	backoff := wait.Backoff{
+		Duration: 200 * time.Millisecond,
+		Factor:   2.0,
+		Jitter:   0.1,
+		Cap:      5 * time.Second,
+		Steps:    math.MaxInt32,
+	}
+
+	deadline := time.Now().Add(retryTimeout)
+	for {
+		err := fn()
+		if err == nil {
+			return nil
+		}
+		if !isRetriableError(err) {
+			return err
+		}
+		delay := backoff.Step()
+		if time.Now().Add(delay).After(deadline) {
+			return fmt.Errorf("still failing after retrying for %s: %w", retryTimeout, err)
+		}
+		time.Sleep(delay)
+	}
+}
+
+// isRetriableError reports whether err is a transient failure that is safe to
+// retry. It covers low-level network errors (e.g. a dropped connection) as well
+// as retriable server-side responses.
+func isRetriableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if utilnet.IsConnectionReset(err) || utilnet.IsConnectionRefused(err) || utilnet.IsProbableEOF(err) {
+		return true
+	}
+	return errors.IsInternalError(err) ||
+		errors.IsServerTimeout(err) ||
+		errors.IsTimeout(err) ||
+		errors.IsTooManyRequests(err) ||
+		errors.IsServiceUnavailable(err)
+}
+
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func randString(n int) (string, error) {
@@ -330,7 +388,15 @@ func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName 
 					"data": data,
 				}
 
-				_, err = cli.Create(context.TODO(), cm, metav1.CreateOptions{})
+				err = retryOnTransient(func() error {
+					_, createErr := cli.Create(context.TODO(), cm, metav1.CreateOptions{})
+					// A retry after a dropped connection may hit an object that the
+					// previous (lost) attempt already created; treat it as success.
+					if errors.IsAlreadyExists(createErr) {
+						return nil
+					}
+					return createErr
+				})
 				if err != nil {
 					return fmt.Errorf("failed to create configmap %s: %v", name, err)
 				}
@@ -367,7 +433,9 @@ func deleteConfigmapsByName(clientset *kubernetes.Clientset, namespace, cmName s
 		for j := start; j < end; j++ {
 			name := fmt.Sprintf("%s-cm-%s-%d", appLebel, cmName, j)
 			g.Go(func() error {
-				err := cmClient.Delete(context.TODO(), name, metav1.DeleteOptions{})
+				err := retryOnTransient(func() error {
+					return cmClient.Delete(context.TODO(), name, metav1.DeleteOptions{})
+				})
 				if err != nil {
 					if errors.IsNotFound(err) {
 						return nil
