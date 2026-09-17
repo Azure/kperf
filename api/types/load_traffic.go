@@ -202,7 +202,8 @@ type RequestPostDel struct {
 	DeleteRatio              float64 `json:"deleteRatio" yaml:"deleteRatio"`
 	// PayloadSize is the size in bytes of a random padding string injected
 	// into the created object (e.g. as a Pod env var value). 0 means no padding.
-	PayloadSize int `json:"payloadSize" yaml:"payloadSize"`
+	PayloadSize  int    `json:"payloadSize" yaml:"payloadSize"`
+	NodeSelector string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 }
 
 // Validate verifies fields of LoadProfile.
@@ -424,6 +425,13 @@ func (r *RequestPostDel) Validate() error {
 
 	if r.PayloadSize < 0 {
 		return fmt.Errorf("payloadSize must >= 0: %v", r.PayloadSize)
+	}
+
+	if r.NodeSelector != "" {
+		key, value, found := strings.Cut(r.NodeSelector, "=")
+		if !found || key == "" || value == "" || strings.Contains(value, "=") {
+			return fmt.Errorf("nodeSelector must use key=value format: %q", r.NodeSelector)
+		}
 	}
 
 	return nil

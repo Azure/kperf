@@ -218,3 +218,73 @@ func TestWeightedRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestPostDelNodeSelectorValidation(t *testing.T) {
+	tests := []struct {
+		name         string
+		nodeSelector string
+		wantErr      bool
+	}{
+		{
+			name: "not configured",
+		},
+		{
+			name:         "configured",
+			nodeSelector: "agentpool=benchmark",
+		},
+		{
+			name:         "missing separator",
+			nodeSelector: "agentpool",
+			wantErr:      true,
+		},
+		{
+			name:         "missing key",
+			nodeSelector: "=benchmark",
+			wantErr:      true,
+		},
+		{
+			name:         "missing value",
+			nodeSelector: "agentpool=",
+			wantErr:      true,
+		},
+		{
+			name:         "multiple separators",
+			nodeSelector: "agentpool=benchmark=extra",
+			wantErr:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := RequestPostDel{
+				KubeGroupVersionResource: KubeGroupVersionResource{
+					Version:  "v1",
+					Resource: "pods",
+				},
+				NodeSelector: tt.nodeSelector,
+			}
+
+			if tt.wantErr {
+				assert.Error(t, request.Validate())
+			} else {
+				assert.NoError(t, request.Validate())
+			}
+		})
+	}
+}
+
+func TestRequestPostDelNodeSelectorUnmarshalFromYAML(t *testing.T) {
+	input := `
+version: v1
+resource: pods
+namespace: default
+deleteRatio: 0.4
+payloadSize: 1024
+nodeSelector: agentpool=benchmark
+`
+
+	var request RequestPostDel
+	require.NoError(t, yaml.Unmarshal([]byte(input), &request))
+	assert.Equal(t, "agentpool=benchmark", request.NodeSelector)
+	assert.NoError(t, request.Validate())
+}
