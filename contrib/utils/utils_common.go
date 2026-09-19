@@ -4,6 +4,8 @@
 package utils
 
 import (
+	"context"
+	"fmt"
 	"time"
 )
 
@@ -61,5 +63,43 @@ func WithJobWaitTimeoutOpt(to time.Duration) JobTimeoutOpt {
 func WithJobDeleteTimeoutOpt(to time.Duration) JobTimeoutOpt {
 	return func(jto *jobsTimeoutOption) {
 		jto.deleteTimeout = to
+
+	}
+}
+
+type DeploymentBatchManager struct {
+	KubeCfgPath           string
+	DeploymentNamePattern string
+	DeploymentReplica     int
+	PaddingBytes          int
+	DeploymentBatchSize   int
+	cleanups              []func()
+}
+
+func (bm *DeploymentBatchManager) Add(ctx context.Context, total int) error {
+	for start := 0; start < total; start += bm.DeploymentBatchSize {
+		// Create a unique name for each deployment batch
+		namePattern := fmt.Sprintf("%s-%d", bm.DeploymentNamePattern, start/bm.DeploymentBatchSize)
+
+		// Calculate the current batch size, ensuring it does not exceed the total
+		currentBatchSize := bm.DeploymentBatchSize
+		if start+currentBatchSize > total {
+			currentBatchSize = total - start
+		}
+
+		cleanup, err := DeployDeployments(ctx, bm.KubeCfgPath, namePattern, currentBatchSize, bm.DeploymentReplica,
+			bm.PaddingBytes, start, 10*time.Minute)
+		if err != nil {
+			return err
+		}
+		// Store the cleanup function to be called later
+		bm.cleanups = append(bm.cleanups, cleanup)
+	}
+	return nil
+}
+
+func (bm *DeploymentBatchManager) CleanAll() {
+	for i := len(bm.cleanups) - 1; i >= 0; i-- {
+		bm.cleanups[i]()
 	}
 }
