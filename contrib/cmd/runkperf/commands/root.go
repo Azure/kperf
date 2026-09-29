@@ -14,6 +14,7 @@ import (
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/configmaps"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/daemonsets"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/events"
+	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/pod"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data/secrets"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/warmup"
 
@@ -26,6 +27,7 @@ func init() {
 		configmaps.Command,
 		daemonsets.Command,
 		events.Command,
+		pod.Command,
 		secrets.Command,
 	)
 }
