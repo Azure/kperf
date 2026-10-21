@@ -386,7 +386,7 @@ func renderPatchBody(raw string) []byte {
 	if !strings.Contains(raw, patchRandomPlaceholder) {
 		return []byte(raw)
 	}
-	return []byte(strings.ReplaceAll(raw, patchRandomPlaceholder, randomPayload(8)))
+	return []byte(strings.ReplaceAll(raw, patchRandomPlaceholder, RandomPayload(8)))
 }
 
 func newRequestPatchBuilder(src *types.RequestPatch, resourceVersion string, maxRetries int) *requestPatchBuilder {
@@ -526,7 +526,7 @@ func (b *requestPostDelBuilder) Build(cli rest.Interface) Requester {
 	body, err := utils.RenderTemplate(b.resource, map[string]interface{}{
 		"namePattern":  name,
 		"namespace":    b.namespace,
-		"payload":      randomPayload(b.payloadSize),
+		"payload":      RandomPayload(b.payloadSize),
 		"nodeSelector": b.nodeSelector,
 	})
 	if err != nil {
@@ -624,7 +624,7 @@ func (b *requestPutBuilder) Build(cli rest.Interface) Requester {
 			Name:      finalName,
 			Namespace: b.namespace,
 		},
-		Data: map[string]string{"payload": randomPayload(b.payloadSize)},
+		Data: map[string]string{"payload": RandomPayload(b.payloadSize)},
 	}
 	body, _ := json.Marshal(cm)
 
@@ -636,12 +636,25 @@ func (b *requestPutBuilder) Build(cli rest.Interface) Requester {
 	}
 }
 
-// randomPayload returns a string of exactly n bytes, uniformly sampled from
+// RandomPayload returns a string of exactly n bytes, uniformly sampled from
 // [a-zA-Z0-9] via crypto/rand with rejection sampling to avoid modulo bias.
-// Returns "" when n <= 0.
-func randomPayload(n int) string {
+// It returns "" when n <= 0 and panics if reading random bytes fails.
+func RandomPayload(n int) string {
 	if n <= 0 {
 		return ""
+	}
+	b, err := RandBytes(n)
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+// RandBytes returns n uniformly sampled alphanumeric bytes using crypto/rand.
+// It returns an error for non-positive lengths or if reading random bytes fails.
+func RandBytes(n int) ([]byte, error) {
+	if n <= 0 {
+		return nil, fmt.Errorf("length must be positive")
 	}
 	const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	// Only use byte values in [0, threshold). Since len(alphabet)=62 and
@@ -659,7 +672,7 @@ func randomPayload(n int) string {
 
 	for i := 0; i < n; {
 		if _, err := rand.Read(buf); err != nil {
-			panic(fmt.Errorf("failed to read random bytes: %w", err))
+			return nil, fmt.Errorf("failed to read random bytes: %w", err)
 		}
 
 		for _, b := range buf {
@@ -669,10 +682,10 @@ func randomPayload(n int) string {
 			out[i] = alphabet[int(b)%len(alphabet)]
 			i++
 			if i == n {
-				return string(out)
+				return out, nil
 			}
 		}
 	}
 
-	return string(out)
+	return out, nil
 }

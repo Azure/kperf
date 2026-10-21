@@ -18,6 +18,7 @@ import (
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
+	"github.com/Azure/kperf/request"
 
 	"github.com/urfave/cli"
 
@@ -331,15 +332,12 @@ func createConfigmaps(clientset *kubernetes.Clientset, namespace string, cmName 
 					"app":     data.AppLabel,
 					"cmName":  cmName,
 				}
-				randData, err := data.RandString(size)
-				if err != nil {
-					return fmt.Errorf("failed to generate random string for configmap %s: %v", name, err)
-				}
+				randData := request.RandomPayload(size)
 				cm.Data = map[string]string{
 					"data": randData,
 				}
 
-				err = retryOnTransient(func() error {
+				err := retryOnTransient(func() error {
 					_, createErr := cli.Create(context.TODO(), cm, metav1.CreateOptions{})
 					// A retry after a dropped connection may hit an object that the
 					// previous (lost) attempt already created; treat it as success.
