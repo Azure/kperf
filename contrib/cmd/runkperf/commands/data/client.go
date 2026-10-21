@@ -6,7 +6,6 @@ package data
 import (
 	"context"
 	"fmt"
-	"math/rand"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,28 +62,4 @@ func PrepareNamespace(clientset *kubernetes.Clientset, namespace string) error {
 		return fmt.Errorf("failed to create namespace %s: %w", namespace, err)
 	}
 	return nil
-}
-
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
-// RandBytes generates a random byte slice of length n using alphanumeric characters.
-func RandBytes(n int) ([]byte, error) {
-	if n <= 0 {
-		return nil, fmt.Errorf("length must be positive")
-	}
-
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = byte(letterRunes[rand.Intn(len(letterRunes))]) //nolint:gosec // G404: intentionally using math/rand for benchmark data, cryptographic randomness not needed
-	}
-	return b, nil
-}
-
-// RandString generates a random string of length n using alphanumeric characters.
-func RandString(n int) (string, error) {
-	b, err := RandBytes(n)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
+	"github.com/Azure/kperf/request"
 
 	"github.com/urfave/cli"
 
@@ -293,10 +294,7 @@ func createEvents(clientset *kubernetes.Clientset, namespace, eventSetName strin
 			g.Go(func() error {
 				name := fmt.Sprintf("%s-ev-%s-%d", data.AppLabel, eventSetName, idx)
 
-				message, err := data.RandString(messageSize)
-				if err != nil {
-					return fmt.Errorf("failed to generate random message for event %s: %v", name, err)
-				}
+				message := request.RandomPayload(messageSize)
 
 				objName := involvedObjectName
 				if objName == "" {
@@ -328,7 +326,7 @@ func createEvents(clientset *kubernetes.Clientset, namespace, eventSetName strin
 					},
 				}
 
-				_, err = clientset.CoreV1().Events(namespace).Create(context.TODO(), event, metav1.CreateOptions{})
+				_, err := clientset.CoreV1().Events(namespace).Create(context.TODO(), event, metav1.CreateOptions{})
 				if err != nil {
 					return fmt.Errorf("failed to create event %s: %v", name, err)
 				}

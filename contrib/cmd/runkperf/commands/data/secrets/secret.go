@@ -15,6 +15,7 @@ import (
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
+	"github.com/Azure/kperf/request"
 
 	"github.com/urfave/cli"
 
@@ -288,7 +289,7 @@ func createSecrets(clientset *kubernetes.Clientset, namespace string, secName st
 			g.Go(func() error {
 				name := fmt.Sprintf("%s-sec-%s-%d", data.AppLabel, secName, idx)
 
-				randData, err := data.RandBytes(size)
+				randData, err := request.RandBytes(size)
 				if err != nil {
 					return fmt.Errorf("failed to generate random data for secret %s: %v", name, err)
 				}

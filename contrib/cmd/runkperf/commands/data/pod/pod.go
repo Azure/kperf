@@ -14,6 +14,7 @@ import (
 
 	"github.com/Azure/kperf/cmd/kperf/commands/utils"
 	"github.com/Azure/kperf/contrib/cmd/runkperf/commands/data"
+	"github.com/Azure/kperf/request"
 
 	"github.com/urfave/cli"
 
@@ -274,10 +275,7 @@ func createPods(clientset kubernetes.Interface, namespace, podSetName string, to
 			g.Go(func() error {
 				name := fmt.Sprintf("%s-pod-%s-%d", data.AppLabel, podSetName, idx)
 
-				padding, err := data.RandString(size)
-				if err != nil {
-					return fmt.Errorf("failed to generate random padding for pod %s: %v", name, err)
-				}
+				padding := request.RandomPayload(size)
 
 				pod := &corev1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -301,7 +299,7 @@ func createPods(clientset kubernetes.Interface, namespace, podSetName string, to
 					},
 				}
 
-				_, err = clientset.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
+				_, err := clientset.CoreV1().Pods(namespace).Create(context.TODO(), pod, metav1.CreateOptions{})
 				if err != nil {
 					return fmt.Errorf("failed to create pod %s: %v", name, err)
 				}
