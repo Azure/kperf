@@ -31,8 +31,10 @@ const defaultBatchSize int64 = 300
 // paddingAnnotation holds random bytes used to inflate each pod's object size.
 const paddingAnnotation = "runkperf.io/padding"
 
-// pauseImage is the placeholder image used for the bare pods. The pods are not
-// expected to be scheduled; they only load the apiserver/etcd with pod objects.
+// Use an unhandled scheduler name to keep ingestion pods unscheduled.
+const dataOnlySchedulerName = "runkperf-data-only"
+
+// pauseImage is the placeholder image used for the bare ingestion pods.
 const pauseImage = "registry.k8s.io/pause:3.9"
 
 var Command = cli.Command{
@@ -290,6 +292,7 @@ func createPods(clientset kubernetes.Interface, namespace, podSetName string, to
 						},
 					},
 					Spec: corev1.PodSpec{
+						SchedulerName: dataOnlySchedulerName,
 						Containers: []corev1.Container{
 							{
 								Name:  "main",
