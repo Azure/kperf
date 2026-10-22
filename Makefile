@@ -10,6 +10,7 @@ GO_BUILDTAGS = -tags "osusergo netgo static_build"
 IMAGE_REPO ?= localhost:5000
 IMAGE_TAG ?= latest
 IMAGE_NAME = $(IMAGE_REPO)/kperf:$(IMAGE_TAG)
+GO_VERSION := $(strip $(shell cat .go-version))
 
 BINARIES=$(addprefix bin/,$(COMMANDS))
 CONTRIB_BINARIES=$(addprefix bin/contrib/,$(CONTRIB_COMMANDS))
@@ -38,7 +39,7 @@ install: ## install binaries
 
 image-build: ## build image
 	@echo building ${IMAGE_NAME}
-	@docker build . -t ${IMAGE_NAME}
+	@docker build --build-arg GO_VERSION=${GO_VERSION} . -t ${IMAGE_NAME}
 
 image-push: image-build ## push image
 	@echo pushing ${IMAGE_NAME}

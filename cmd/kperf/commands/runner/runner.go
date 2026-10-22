@@ -124,7 +124,7 @@ var runCommand = cli.Command{
 			return err
 		}
 
-		var f *os.File = os.Stdout
+		f := os.Stdout
 		outputFilePath := cliCtx.String("result")
 		if outputFilePath != "" {
 			outputFileDir := filepath.Dir(outputFilePath)
