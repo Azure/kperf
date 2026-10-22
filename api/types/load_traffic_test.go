@@ -218,3 +218,118 @@ func TestWeightedRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestPostDelNodeSelectorValidation(t *testing.T) {
+	tests := []struct {
+		name     string
+		group    string
+		version  string
+		resource string
+		pod      *PostDelPodOptions
+		wantErr  bool
+	}{
+		{
+			name:     "not configured",
+			version:  "v1",
+			resource: "pods",
+		},
+		{
+			name:     "other resource without node selector",
+			group:    "apps",
+			version:  "v1",
+			resource: "deployments",
+		},
+		{
+			name:     "configured",
+			version:  "v1",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "benchmark"},
+			},
+		},
+		{
+			name:     "unsupported group",
+			group:    "apps",
+			version:  "v1",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "benchmark"},
+			},
+			wantErr: true,
+		},
+		{
+			name:     "unsupported version",
+			version:  "v2",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "benchmark"},
+			},
+			wantErr: true,
+		},
+		{
+			name:     "unsupported resource",
+			version:  "v1",
+			resource: "deployments",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "benchmark"},
+			},
+			wantErr: true,
+		},
+		{
+			name:     "invalid selector key",
+			version:  "v1",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"invalid key": "benchmark"},
+			},
+			wantErr: true,
+		},
+		{
+			name:     "invalid selector value",
+			version:  "v1",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "invalid value"},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := RequestPostDel{
+				KubeGroupVersionResource: KubeGroupVersionResource{
+					Group:    tt.group,
+					Version:  tt.version,
+					Resource: tt.resource,
+				},
+				Pod: tt.pod,
+			}
+
+			if tt.wantErr {
+				assert.Error(t, request.Validate())
+			} else {
+				assert.NoError(t, request.Validate())
+			}
+		})
+	}
+}
+
+func TestRequestPostDelNodeSelectorUnmarshalFromYAML(t *testing.T) {
+	input := `
+version: v1
+resource: pods
+namespace: default
+deleteRatio: 0.4
+payloadSize: 1024
+pod:
+  nodeSelector:
+    agentpool: benchmark
+`
+
+	var request RequestPostDel
+	require.NoError(t, yaml.Unmarshal([]byte(input), &request))
+	require.NotNil(t, request.Pod)
+	assert.Equal(t, map[string]string{"agentpool": "benchmark"}, request.Pod.NodeSelector)
+	assert.NoError(t, request.Validate())
+}

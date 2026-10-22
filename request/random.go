@@ -452,6 +452,7 @@ type requestPostDelBuilder struct {
 	namespace       string
 	deleteRatio     float64
 	payloadSize     int
+	nodeSelector    map[string]string
 	maxRetries      int
 
 	// Per-builder cache for created resources
@@ -462,6 +463,11 @@ type requestPostDelBuilder struct {
 }
 
 func newRequestPostDelBuilder(src *types.RequestPostDel, resourceVersion string, maxRetries int) *requestPostDelBuilder {
+	var nodeSelector map[string]string
+	if src.Pod != nil {
+		nodeSelector = src.Pod.NodeSelector
+	}
+
 	return &requestPostDelBuilder{
 		version:         schema.GroupVersion{Group: src.Group, Version: src.Version},
 		resource:        src.Resource,
@@ -469,6 +475,7 @@ func newRequestPostDelBuilder(src *types.RequestPostDel, resourceVersion string,
 		namespace:       src.Namespace,
 		deleteRatio:     src.DeleteRatio,
 		payloadSize:     src.PayloadSize,
+		nodeSelector:    nodeSelector,
 		maxRetries:      maxRetries,
 		cache:           InitCache(), // Initialize the cache
 	}
@@ -520,9 +527,10 @@ func (b *requestPostDelBuilder) Build(cli rest.Interface) Requester {
 	name := fmt.Sprintf("%d-%d", timestamp, counter)
 
 	body, err := utils.RenderTemplate(b.resource, map[string]interface{}{
-		"namePattern": name,
-		"namespace":   b.namespace,
-		"payload":     randomPayload(b.payloadSize),
+		"namePattern":  name,
+		"namespace":    b.namespace,
+		"payload":      randomPayload(b.payloadSize),
+		"nodeSelector": b.nodeSelector,
 	})
 	if err != nil {
 		panic(fmt.Errorf("failed to render %s template: %w", b.resource, err))
