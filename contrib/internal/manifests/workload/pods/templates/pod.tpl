@@ -1,8 +1,7 @@
 {{- $name:= .Values.namePattern }}
 {{- $namespace:= .Values.namespace }}
 {{- $payload:= .Values.payload }}
-{{- $nodeSelectorKey:= .Values.nodeSelectorKey }}
-{{- $nodeSelectorValue:= .Values.nodeSelectorValue }}
+{{- $nodeSelector:= .Values.nodeSelector }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -11,9 +10,11 @@ metadata:
   labels:
     app: fake-pod
 spec:
-  {{- if $nodeSelectorKey }}
+  {{- if $nodeSelector }}
   nodeSelector:
-    "{{ $nodeSelectorKey }}": "{{ $nodeSelectorValue }}"
+    {{- range $key, $value := $nodeSelector }}
+    "{{ $key }}": "{{ $value }}"
+    {{- end }}
   {{- end }}
   # Use pause image so pods reach Running with few events, avoiding an
   # ImagePullBackOff loop that keeps producing events and filling etcd.

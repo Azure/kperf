@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"strings"
 
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	apitypes "k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // ContentType represents the format of response.
@@ -202,8 +204,19 @@ type RequestPostDel struct {
 	DeleteRatio              float64 `json:"deleteRatio" yaml:"deleteRatio"`
 	// PayloadSize is the size in bytes of a random padding string injected
 	// into the created object (e.g. as a Pod env var value). 0 means no padding.
-	PayloadSize  int    `json:"payloadSize" yaml:"payloadSize"`
-	NodeSelector string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
+	PayloadSize int `json:"payloadSize" yaml:"payloadSize"`
+	// Pod contains options for Pods created by POST operations.
+	Pod *PostDelPodOptions `json:"pod,omitempty" yaml:"pod,omitempty"`
+}
+
+type PostDelPodOptions struct {
+	// NodeSelector schedules workload Pods separately from runner Pods, for
+	// example on a dedicated node pool:
+	//
+	//	pod:
+	//	  nodeSelector:
+	//	    agentpool: benchmark
+	NodeSelector map[string]string `json:"nodeSelector,omitempty" yaml:"nodeSelector,omitempty"`
 }
 
 // Validate verifies fields of LoadProfile.
@@ -427,10 +440,14 @@ func (r *RequestPostDel) Validate() error {
 		return fmt.Errorf("payloadSize must >= 0: %v", r.PayloadSize)
 	}
 
-	if r.NodeSelector != "" {
-		key, value, found := strings.Cut(r.NodeSelector, "=")
-		if !found || key == "" || value == "" || strings.Contains(value, "=") {
-			return fmt.Errorf("nodeSelector must use key=value format: %q", r.NodeSelector)
+	if r.Pod != nil && len(r.Pod.NodeSelector) > 0 {
+		if r.Group != "" || r.Version != "v1" || r.Resource != "pods" {
+			return fmt.Errorf("pod nodeSelector only supports core/v1/pods")
+		}
+
+		errs := metav1validation.ValidateLabels(r.Pod.NodeSelector, field.NewPath("pod", "nodeSelector"))
+		if len(errs) > 0 {
+			return fmt.Errorf("invalid pod nodeSelector: %v", errs.ToAggregate())
 		}
 	}
 

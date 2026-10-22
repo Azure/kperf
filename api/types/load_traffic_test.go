@@ -221,36 +221,77 @@ func TestWeightedRequest(t *testing.T) {
 
 func TestRequestPostDelNodeSelectorValidation(t *testing.T) {
 	tests := []struct {
-		name         string
-		nodeSelector string
-		wantErr      bool
+		name     string
+		group    string
+		version  string
+		resource string
+		pod      *PostDelPodOptions
+		wantErr  bool
 	}{
 		{
-			name: "not configured",
+			name:     "not configured",
+			version:  "v1",
+			resource: "pods",
 		},
 		{
-			name:         "configured",
-			nodeSelector: "agentpool=benchmark",
+			name:     "other resource without node selector",
+			group:    "apps",
+			version:  "v1",
+			resource: "deployments",
 		},
 		{
-			name:         "missing separator",
-			nodeSelector: "agentpool",
-			wantErr:      true,
+			name:     "configured",
+			version:  "v1",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "benchmark"},
+			},
 		},
 		{
-			name:         "missing key",
-			nodeSelector: "=benchmark",
-			wantErr:      true,
+			name:     "unsupported group",
+			group:    "apps",
+			version:  "v1",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "benchmark"},
+			},
+			wantErr: true,
 		},
 		{
-			name:         "missing value",
-			nodeSelector: "agentpool=",
-			wantErr:      true,
+			name:     "unsupported version",
+			version:  "v2",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "benchmark"},
+			},
+			wantErr: true,
 		},
 		{
-			name:         "multiple separators",
-			nodeSelector: "agentpool=benchmark=extra",
-			wantErr:      true,
+			name:     "unsupported resource",
+			version:  "v1",
+			resource: "deployments",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "benchmark"},
+			},
+			wantErr: true,
+		},
+		{
+			name:     "invalid selector key",
+			version:  "v1",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"invalid key": "benchmark"},
+			},
+			wantErr: true,
+		},
+		{
+			name:     "invalid selector value",
+			version:  "v1",
+			resource: "pods",
+			pod: &PostDelPodOptions{
+				NodeSelector: map[string]string{"agentpool": "invalid value"},
+			},
+			wantErr: true,
 		},
 	}
 
@@ -258,10 +299,11 @@ func TestRequestPostDelNodeSelectorValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := RequestPostDel{
 				KubeGroupVersionResource: KubeGroupVersionResource{
-					Version:  "v1",
-					Resource: "pods",
+					Group:    tt.group,
+					Version:  tt.version,
+					Resource: tt.resource,
 				},
-				NodeSelector: tt.nodeSelector,
+				Pod: tt.pod,
 			}
 
 			if tt.wantErr {
@@ -280,11 +322,14 @@ resource: pods
 namespace: default
 deleteRatio: 0.4
 payloadSize: 1024
-nodeSelector: agentpool=benchmark
+pod:
+  nodeSelector:
+    agentpool: benchmark
 `
 
 	var request RequestPostDel
 	require.NoError(t, yaml.Unmarshal([]byte(input), &request))
-	assert.Equal(t, "agentpool=benchmark", request.NodeSelector)
+	require.NotNil(t, request.Pod)
+	assert.Equal(t, map[string]string{"agentpool": "benchmark"}, request.Pod.NodeSelector)
 	assert.NoError(t, request.Validate())
 }
