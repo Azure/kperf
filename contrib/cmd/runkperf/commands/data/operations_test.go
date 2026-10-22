@@ -101,7 +101,7 @@ func TestBatchDeleteWaves(t *testing.T) {
 			}
 			started := make(chan int, len(names))
 			done := make(chan error, 1)
-			var completed, active atomic.Int32
+			var completed, active atomic.Int64
 			listed := false
 			go func() {
 				done <- BatchDelete("pod", "default", groupSize, func(visit func(string) error) error {
@@ -115,8 +115,8 @@ func TestBatchDeleteWaves(t *testing.T) {
 						return err
 					}
 					wave := idx / groupSize
-					assert.GreaterOrEqual(t, completed.Load(), int32(wave*groupSize), "previous wave must finish")
-					assert.LessOrEqual(t, active.Add(1), int32(groupSize))
+					assert.GreaterOrEqual(t, completed.Load(), int64(wave*groupSize), "previous wave must finish")
+					assert.LessOrEqual(t, active.Add(1), int64(groupSize))
 					defer active.Add(-1)
 					started <- idx
 					select {
@@ -144,7 +144,7 @@ func TestBatchDeleteWaves(t *testing.T) {
 				close(releases[wave])
 			}
 			require.NoError(t, <-done)
-			assert.Equal(t, int32(len(names)), completed.Load())
+			assert.Equal(t, int64(len(names)), completed.Load())
 		})
 	}
 }
