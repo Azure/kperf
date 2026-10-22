@@ -45,6 +45,7 @@ func TestCreatePods(t *testing.T) {
 		assert.Equal(t, data.AppLabel, pod.Labels["app"])
 		assert.Equal(t, podSetName, pod.Labels["podSetName"])
 		assert.Len(t, pod.Annotations[paddingAnnotation], size)
+		assert.Equal(t, "runkperf-data-only", pod.Spec.SchedulerName)
 		require.Len(t, pod.Spec.Containers, 1)
 		assert.Equal(t, pauseImage, pod.Spec.Containers[0].Image)
 	}
