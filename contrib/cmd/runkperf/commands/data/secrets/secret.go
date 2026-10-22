@@ -20,14 +20,9 @@ import (
 	"github.com/urfave/cli"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
-
-// defaultBatchSize is the number of secrets to list or delete per batch.
-// It is used as the page size for paginated API calls.
-const defaultBatchSize int64 = 300
 
 var Command = cli.Command{
 	Name:      "secret",
@@ -218,7 +213,7 @@ var secretListCommand = cli.Command{
 			ownerID map[string]int // ownerID -> count of secrets in that group
 		}
 		secMap := make(map[string]*secretSetInfo)
-		err = listSecrets(clientset, labelSelector, namespace, defaultBatchSize, func(sec corev1.Secret) error {
+		err = listSecrets(clientset, labelSelector, namespace, data.DefaultPageSize, func(sec corev1.Secret) error {
 			name, ok := sec.Labels["secName"]
 			if !ok {
 				return fmt.Errorf("failed to find the secName of secret %s", sec.Name)
@@ -280,7 +275,7 @@ func checkSecretParams(size int, groupSize int, total int) error {
 	return nil
 }
 
-func createSecrets(clientset *kubernetes.Clientset, namespace string, secName string, size int, groupSize int, total int) error {
+func createSecrets(clientset kubernetes.Interface, namespace string, secName string, size int, groupSize int, total int) error {
 	for i := 0; i < total; i += groupSize {
 		ownerID := i
 		g := new(errgroup.Group)
@@ -323,66 +318,22 @@ func createSecrets(clientset *kubernetes.Clientset, namespace string, secName st
 	return nil
 }
 
-func deleteSecrets(clientset *kubernetes.Clientset, labelSelector string, namespace string, groupSize int) error {
-	var names []string
-	err := listSecrets(clientset, labelSelector, namespace, defaultBatchSize, func(sec corev1.Secret) error {
-		names = append(names, sec.Name)
-		return nil
+func deleteSecrets(clientset kubernetes.Interface, labelSelector string, namespace string, groupSize int) error {
+	return data.BatchDelete("secret", namespace, groupSize, func(visit func(string) error) error {
+		return listSecrets(clientset, labelSelector, namespace, data.DefaultPageSize, func(sec corev1.Secret) error {
+			return visit(sec.Name)
+		})
+	}, func(name string) error {
+		return clientset.CoreV1().Secrets(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	})
-	if err != nil {
-		return err
-	}
-
-	if len(names) == 0 {
-		fmt.Printf("No secrets found in namespace %s, nothing to delete\n", namespace)
-		return nil
-	}
-
-	n := len(names)
-	for i := 0; i < n; i += groupSize {
-		g := new(errgroup.Group)
-		for j := i; j < i+groupSize && j < n; j++ {
-			idx := j
-			g.Go(func() error {
-				err := clientset.CoreV1().Secrets(namespace).Delete(context.TODO(), names[idx], metav1.DeleteOptions{})
-				if err != nil && !errors.IsNotFound(err) {
-					return fmt.Errorf("failed to delete secret %s: %v", names[idx], err)
-				}
-				return nil
-			})
-		}
-		if err := g.Wait(); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
-func listSecrets(clientset *kubernetes.Clientset, labelSelector string, namespace string, limit int64, fn func(corev1.Secret) error) error {
-	if limit <= 0 {
-		limit = defaultBatchSize
-	}
-	var continueToken string
-	for {
-		secrets, err := clientset.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-			Limit:         limit,
-			Continue:      continueToken,
-		})
+func listSecrets(clientset kubernetes.Interface, labelSelector string, namespace string, limit int64, fn func(corev1.Secret) error) error {
+	return data.ListPaginated(metav1.ListOptions{LabelSelector: labelSelector, Limit: limit}, func(opts metav1.ListOptions) ([]corev1.Secret, string, error) {
+		secrets, err := clientset.CoreV1().Secrets(namespace).List(context.TODO(), opts)
 		if err != nil {
-			return fmt.Errorf("failed to list secrets: %v", err)
+			return nil, "", fmt.Errorf("failed to list secrets: %w", err)
 		}
-
-		for _, sec := range secrets.Items {
-			if err := fn(sec); err != nil {
-				return err
-			}
-		}
-
-		continueToken = secrets.Continue
-		if continueToken == "" {
-			break
-		}
-	}
-	return nil
+		return secrets.Items, secrets.Continue, nil
+	}, fn)
 }
