@@ -20,14 +20,9 @@ import (
 	"github.com/urfave/cli"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
-
-// defaultBatchSize is the number of events to list or delete per batch.
-// It is used as the page size for paginated API calls.
-const defaultBatchSize int64 = 300
 
 var Command = cli.Command{
 	Name:      "event",
@@ -147,7 +142,17 @@ var eventAddCommand = cli.Command{
 			return err
 		}
 
-		err = createEvents(clientset, namespace, eventSetName, total, groupSize, reason, eventType, messageSize, involvedObjectKind, involvedObjectName)
+		err = createEvents(clientset, createOptions{
+			Namespace:          namespace,
+			EventSetName:       eventSetName,
+			Total:              total,
+			GroupSize:          groupSize,
+			Reason:             reason,
+			EventType:          eventType,
+			MessageSize:        messageSize,
+			InvolvedObjectKind: involvedObjectKind,
+			InvolvedObjectName: involvedObjectName,
+		})
 		if err != nil {
 			return err
 		}
@@ -245,7 +250,7 @@ var eventListCommand = cli.Command{
 		}
 
 		evMap := make(map[string]*eventSetInfo)
-		err = listEvents(clientset, labelSelector, namespace, defaultBatchSize, func(ev corev1.Event) error {
+		err = listEvents(clientset, labelSelector, namespace, data.DefaultPageSize, func(ev corev1.Event) error {
 			name, ok := ev.Labels["eventSetName"]
 			if !ok {
 				return nil
@@ -284,40 +289,52 @@ type eventSetInfo struct {
 	total     int
 }
 
-func createEvents(clientset *kubernetes.Clientset, namespace, eventSetName string, total, groupSize int, reason, eventType string, messageSize int, involvedObjectKind, involvedObjectName string) error {
+type createOptions struct {
+	Namespace          string
+	EventSetName       string
+	Total              int
+	GroupSize          int
+	Reason             string
+	EventType          string
+	MessageSize        int
+	InvolvedObjectKind string
+	InvolvedObjectName string
+}
+
+func createEvents(clientset kubernetes.Interface, opts createOptions) error {
 	now := time.Now()
 
-	for i := 0; i < total; i += groupSize {
+	for i := 0; i < opts.Total; i += opts.GroupSize {
 		g := new(errgroup.Group)
-		for j := i; j < i+groupSize && j < total; j++ {
+		for j := i; j < i+opts.GroupSize && j < opts.Total; j++ {
 			idx := j
 			g.Go(func() error {
-				name := fmt.Sprintf("%s-ev-%s-%d", data.AppLabel, eventSetName, idx)
+				name := fmt.Sprintf("%s-ev-%s-%d", data.AppLabel, opts.EventSetName, idx)
 
-				message := request.RandomPayload(messageSize)
+				message := request.RandomPayload(opts.MessageSize)
 
-				objName := involvedObjectName
+				objName := opts.InvolvedObjectName
 				if objName == "" {
-					objName = fmt.Sprintf("%s-obj-%d", eventSetName, idx)
+					objName = fmt.Sprintf("%s-obj-%d", opts.EventSetName, idx)
 				}
 
 				event := &corev1.Event{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      name,
-						Namespace: namespace,
+						Namespace: opts.Namespace,
 						Labels: map[string]string{
 							"app":          data.AppLabel,
-							"eventSetName": eventSetName,
+							"eventSetName": opts.EventSetName,
 						},
 					},
 					InvolvedObject: corev1.ObjectReference{
-						Kind:      involvedObjectKind,
+						Kind:      opts.InvolvedObjectKind,
 						Name:      objName,
-						Namespace: namespace,
+						Namespace: opts.Namespace,
 					},
-					Reason:         reason,
+					Reason:         opts.Reason,
 					Message:        message,
-					Type:           eventType,
+					Type:           opts.EventType,
 					Count:          1,
 					FirstTimestamp: metav1.NewTime(now),
 					LastTimestamp:  metav1.NewTime(now),
@@ -326,7 +343,7 @@ func createEvents(clientset *kubernetes.Clientset, namespace, eventSetName strin
 					},
 				}
 
-				_, err := clientset.CoreV1().Events(namespace).Create(context.TODO(), event, metav1.CreateOptions{})
+				_, err := clientset.CoreV1().Events(opts.Namespace).Create(context.TODO(), event, metav1.CreateOptions{})
 				if err != nil {
 					return fmt.Errorf("failed to create event %s: %v", name, err)
 				}
@@ -340,66 +357,22 @@ func createEvents(clientset *kubernetes.Clientset, namespace, eventSetName strin
 	return nil
 }
 
-func deleteEvents(clientset *kubernetes.Clientset, labelSelector, namespace string, groupSize int) error {
-	var names []string
-	err := listEvents(clientset, labelSelector, namespace, defaultBatchSize, func(ev corev1.Event) error {
-		names = append(names, ev.Name)
-		return nil
+func deleteEvents(clientset kubernetes.Interface, labelSelector, namespace string, groupSize int) error {
+	return data.BatchDelete("event", namespace, groupSize, func(visit func(string) error) error {
+		return listEvents(clientset, labelSelector, namespace, data.DefaultPageSize, func(ev corev1.Event) error {
+			return visit(ev.Name)
+		})
+	}, func(name string) error {
+		return clientset.CoreV1().Events(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	})
-	if err != nil {
-		return err
-	}
-
-	if len(names) == 0 {
-		fmt.Printf("No events found in namespace %s, nothing to delete\n", namespace)
-		return nil
-	}
-
-	n := len(names)
-	for i := 0; i < n; i += groupSize {
-		g := new(errgroup.Group)
-		for j := i; j < i+groupSize && j < n; j++ {
-			idx := j
-			g.Go(func() error {
-				err := clientset.CoreV1().Events(namespace).Delete(context.TODO(), names[idx], metav1.DeleteOptions{})
-				if err != nil && !errors.IsNotFound(err) {
-					return fmt.Errorf("failed to delete event %s: %v", names[idx], err)
-				}
-				return nil
-			})
-		}
-		if err := g.Wait(); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
-func listEvents(clientset *kubernetes.Clientset, labelSelector, namespace string, limit int64, fn func(corev1.Event) error) error {
-	if limit <= 0 {
-		limit = defaultBatchSize
-	}
-	var continueToken string
-	for {
-		eventList, err := clientset.CoreV1().Events(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-			Limit:         limit,
-			Continue:      continueToken,
-		})
+func listEvents(clientset kubernetes.Interface, labelSelector, namespace string, limit int64, fn func(corev1.Event) error) error {
+	return data.ListPaginated(metav1.ListOptions{LabelSelector: labelSelector, Limit: limit}, func(opts metav1.ListOptions) ([]corev1.Event, string, error) {
+		eventList, err := clientset.CoreV1().Events(namespace).List(context.TODO(), opts)
 		if err != nil {
-			return fmt.Errorf("failed to list events: %v", err)
+			return nil, "", fmt.Errorf("failed to list events: %w", err)
 		}
-
-		for _, ev := range eventList.Items {
-			if err := fn(ev); err != nil {
-				return err
-			}
-		}
-
-		continueToken = eventList.Continue
-		if continueToken == "" {
-			break
-		}
-	}
-	return nil
+		return eventList.Items, eventList.Continue, nil
+	}, fn)
 }

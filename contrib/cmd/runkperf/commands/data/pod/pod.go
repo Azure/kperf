@@ -19,14 +19,9 @@ import (
 	"github.com/urfave/cli"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
-
-// defaultBatchSize is the number of pods to list or delete per batch.
-// It is used as the page size for paginated API calls.
-const defaultBatchSize int64 = 300
 
 // paddingAnnotation holds random bytes used to inflate each pod's object size.
 const paddingAnnotation = "runkperf.io/padding"
@@ -220,7 +215,7 @@ var podListCommand = cli.Command{
 		}
 
 		podMap := make(map[string]*podSetInfo)
-		err = listPods(clientset, labelSelector, namespace, defaultBatchSize, func(pod corev1.Pod) error {
+		err = listPods(clientset, labelSelector, namespace, data.DefaultPageSize, func(pod corev1.Pod) error {
 			name, ok := pod.Labels["podSetName"]
 			if !ok {
 				return nil
@@ -317,65 +312,21 @@ func createPods(clientset kubernetes.Interface, namespace, podSetName string, to
 }
 
 func deletePods(clientset kubernetes.Interface, labelSelector, namespace string, groupSize int) error {
-	var names []string
-	err := listPods(clientset, labelSelector, namespace, defaultBatchSize, func(pod corev1.Pod) error {
-		names = append(names, pod.Name)
-		return nil
+	return data.BatchDelete("pod", namespace, groupSize, func(visit func(string) error) error {
+		return listPods(clientset, labelSelector, namespace, data.DefaultPageSize, func(pod corev1.Pod) error {
+			return visit(pod.Name)
+		})
+	}, func(name string) error {
+		return clientset.CoreV1().Pods(namespace).Delete(context.TODO(), name, metav1.DeleteOptions{})
 	})
-	if err != nil {
-		return err
-	}
-
-	if len(names) == 0 {
-		fmt.Printf("No pods found in namespace %s, nothing to delete\n", namespace)
-		return nil
-	}
-
-	n := len(names)
-	for i := 0; i < n; i += groupSize {
-		g := new(errgroup.Group)
-		for j := i; j < i+groupSize && j < n; j++ {
-			idx := j
-			g.Go(func() error {
-				err := clientset.CoreV1().Pods(namespace).Delete(context.TODO(), names[idx], metav1.DeleteOptions{})
-				if err != nil && !errors.IsNotFound(err) {
-					return fmt.Errorf("failed to delete pod %s: %v", names[idx], err)
-				}
-				return nil
-			})
-		}
-		if err := g.Wait(); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func listPods(clientset kubernetes.Interface, labelSelector, namespace string, limit int64, fn func(corev1.Pod) error) error {
-	if limit <= 0 {
-		limit = defaultBatchSize
-	}
-	var continueToken string
-	for {
-		podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
-			LabelSelector: labelSelector,
-			Limit:         limit,
-			Continue:      continueToken,
-		})
+	return data.ListPaginated(metav1.ListOptions{LabelSelector: labelSelector, Limit: limit}, func(opts metav1.ListOptions) ([]corev1.Pod, string, error) {
+		podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), opts)
 		if err != nil {
-			return fmt.Errorf("failed to list pods: %v", err)
+			return nil, "", fmt.Errorf("failed to list pods: %w", err)
 		}
-
-		for _, pod := range podList.Items {
-			if err := fn(pod); err != nil {
-				return err
-			}
-		}
-
-		continueToken = podList.Continue
-		if continueToken == "" {
-			break
-		}
-	}
-	return nil
+		return podList.Items, podList.Continue, nil
+	}, fn)
 }
