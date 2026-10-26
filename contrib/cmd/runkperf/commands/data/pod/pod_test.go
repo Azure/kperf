@@ -30,7 +30,7 @@ func TestCheckPodParams(t *testing.T) {
 }
 
 func TestCreatePods(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	const (
 		namespace  = "default"
 		podSetName = "set-a"
@@ -57,7 +57,7 @@ func TestCreatePods(t *testing.T) {
 }
 
 func TestListPods(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	const namespace = "default"
 
 	require.NoError(t, createPods(clientset, namespace, "set-a", 5, 3, 64))
@@ -86,7 +86,7 @@ func TestListPods(t *testing.T) {
 }
 
 func TestDeletePods(t *testing.T) {
-	clientset := fake.NewSimpleClientset()
+	clientset := fake.NewClientset()
 	const namespace = "default"
 
 	require.NoError(t, createPods(clientset, namespace, "set-a", 4, 2, 16))
@@ -107,7 +107,7 @@ func TestDeletePods(t *testing.T) {
 }
 
 func TestDeletePodsPages(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	calls := 0
 	client.PrependReactor("list", "pods", func(action ktesting.Action) (bool, runtime.Object, error) {
 		opts := action.(ktesting.ListActionImpl).GetListOptions()
@@ -141,7 +141,7 @@ func TestDeletePodsPages(t *testing.T) {
 func TestPodOperationErrors(t *testing.T) {
 	for _, verb := range []string{"list", "delete"} {
 		t.Run(verb, func(t *testing.T) {
-			client := fake.NewSimpleClientset(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default"}})
+			client := fake.NewClientset(&corev1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "pod", Namespace: "default"}})
 			sentinel := errors.New("denied")
 			client.PrependReactor(verb, "pods", func(ktesting.Action) (bool, runtime.Object, error) {
 				return true, nil, sentinel

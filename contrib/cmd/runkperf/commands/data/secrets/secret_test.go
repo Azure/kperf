@@ -21,7 +21,7 @@ import (
 )
 
 func TestCreateAndDeleteSecrets(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	require.NoError(t, createSecrets(client, "default", "set-a", 32, 2, 5))
 	require.NoError(t, createSecrets(client, "default", "set-b", 16, 10, 1))
 	secrets, err := client.CoreV1().Secrets("default").List(context.TODO(), metav1.ListOptions{})
@@ -48,7 +48,7 @@ func TestCreateAndDeleteSecrets(t *testing.T) {
 }
 
 func TestDeleteSecretsPages(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	calls := 0
 	client.PrependReactor("list", "secrets", func(action ktesting.Action) (bool, runtime.Object, error) {
 		opts := action.(ktesting.ListActionImpl).GetListOptions()
@@ -82,7 +82,7 @@ func TestDeleteSecretsPages(t *testing.T) {
 func TestSecretOperationErrors(t *testing.T) {
 	for _, verb := range []string{"list", "delete"} {
 		t.Run(verb, func(t *testing.T) {
-			client := fake.NewSimpleClientset(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret", Namespace: "default"}})
+			client := fake.NewClientset(&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "secret", Namespace: "default"}})
 			sentinel := errors.New("denied")
 			client.PrependReactor(verb, "secrets", func(ktesting.Action) (bool, runtime.Object, error) {
 				return true, nil, sentinel

@@ -21,7 +21,7 @@ import (
 )
 
 func TestCreateAndDeleteEvents(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	opts := createOptions{
 		Namespace: "default", EventSetName: "set-a", Total: 5, GroupSize: 2,
 		Reason: "Benchmark", EventType: "Warning", MessageSize: 32, InvolvedObjectKind: "Pod",
@@ -61,7 +61,7 @@ func TestCreateAndDeleteEvents(t *testing.T) {
 }
 
 func TestDeleteEventsPages(t *testing.T) {
-	client := fake.NewSimpleClientset()
+	client := fake.NewClientset()
 	calls := 0
 	client.PrependReactor("list", "events", func(action ktesting.Action) (bool, runtime.Object, error) {
 		opts := action.(ktesting.ListActionImpl).GetListOptions()
@@ -95,7 +95,7 @@ func TestDeleteEventsPages(t *testing.T) {
 func TestEventOperationErrors(t *testing.T) {
 	for _, verb := range []string{"list", "delete"} {
 		t.Run(verb, func(t *testing.T) {
-			client := fake.NewSimpleClientset(&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "event", Namespace: "default"}})
+			client := fake.NewClientset(&corev1.Event{ObjectMeta: metav1.ObjectMeta{Name: "event", Namespace: "default"}})
 			sentinel := errors.New("denied")
 			client.PrependReactor(verb, "events", func(ktesting.Action) (bool, runtime.Object, error) {
 				return true, nil, sentinel
