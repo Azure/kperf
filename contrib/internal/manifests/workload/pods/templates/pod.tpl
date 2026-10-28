@@ -2,18 +2,33 @@
 {{- $namespace:= .Values.namespace }}
 {{- $payload:= .Values.payload }}
 {{- $nodeSelector:= .Values.nodeSelector }}
+{{- $hasApp := false }}
+{{- range $key, $value := .Values.labels }}
+{{- if eq $key "app" }}{{ $hasApp = true }}{{ end }}
+{{- end }}
 apiVersion: v1
 kind: Pod
 metadata:
-  name: {{ $name }}
-  namespace: {{ $namespace }}
+  name: {{ printf "%q" $name }}
+  namespace: {{ printf "%q" $namespace }}
   labels:
+    {{- if not $hasApp }}
     app: fake-pod
+    {{- end }}
+    {{- range $key, $value := .Values.labels }}
+    {{ printf "%q" $key }}: {{ printf "%q" $value }}
+    {{- end }}
 spec:
+  {{- if .Values.serviceAccountName }}
+  serviceAccountName: {{ printf "%q" .Values.serviceAccountName }}
+  {{- end }}
+  {{- if .Values.schedulerName }}
+  schedulerName: {{ printf "%q" .Values.schedulerName }}
+  {{- end }}
   {{- if $nodeSelector }}
   nodeSelector:
     {{- range $key, $value := $nodeSelector }}
-    "{{ $key }}": "{{ $value }}"
+    {{ printf "%q" $key }}: {{ printf "%q" $value }}
     {{- end }}
   {{- end }}
   # Use pause image so pods reach Running with few events, avoiding an
