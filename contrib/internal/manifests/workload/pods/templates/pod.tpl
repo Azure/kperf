@@ -8,8 +8,19 @@ metadata:
   name: {{ $name }}
   namespace: {{ $namespace }}
   labels:
+    {{- range $key, $value := .Values.labels }}
+    "{{ $key }}": "{{ $value }}"
+    {{- end }}
+    {{- if eq .Values.labels.app nil }}
     app: fake-pod
+    {{- end }}
 spec:
+  {{- if .Values.serviceAccountName }}
+  serviceAccountName: "{{ .Values.serviceAccountName }}"
+  {{- end }}
+  {{- if .Values.schedulerName }}
+  schedulerName: "{{ .Values.schedulerName }}"
+  {{- end }}
   {{- if $nodeSelector }}
   nodeSelector:
     {{- range $key, $value := $nodeSelector }}
