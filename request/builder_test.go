@@ -105,12 +105,19 @@ func TestPodOptions(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
 		options *types.PostDelPodOptions
+		labels  map[string]string
 	}{
-		{name: "defaults"},
+		{name: "defaults", labels: map[string]string{"app": "fake-pod"}},
+		{name: "empty app", options: &types.PostDelPodOptions{
+			Labels: map[string]string{"app": ""},
+		}, labels: map[string]string{"app": ""}},
+		{name: "other labels", options: &types.PostDelPodOptions{
+			Labels: map[string]string{"team": "benchmark"},
+		}, labels: map[string]string{"app": "fake-pod", "team": "benchmark"}},
 		{name: "custom", options: &types.PostDelPodOptions{
-			Labels: map[string]string{"app": ""}, NodeSelector: map[string]string{"agentpool": "benchmark"},
+			Labels: map[string]string{"app": "custom-app", "team": "benchmark"}, NodeSelector: map[string]string{"agentpool": "benchmark"},
 			ServiceAccountName: "custom-account", SchedulerName: "custom-scheduler",
-		}},
+		}, labels: map[string]string{"app": "custom-app", "team": "benchmark"}},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := newRequestPostDelBuilder(&types.RequestPostDel{
@@ -136,9 +143,9 @@ func TestPodOptions(t *testing.T) {
 			require.Equal(t, "default", pod.Namespace)
 			options := tt.options
 			if options == nil {
-				options = &types.PostDelPodOptions{Labels: map[string]string{"app": "fake-pod"}}
+				options = &types.PostDelPodOptions{}
 			}
-			require.Equal(t, options.Labels, pod.Labels)
+			require.Equal(t, tt.labels, pod.Labels)
 			require.Equal(t, options.NodeSelector, pod.Spec.NodeSelector)
 			require.Equal(t, options.ServiceAccountName, pod.Spec.ServiceAccountName)
 			require.Equal(t, options.SchedulerName, pod.Spec.SchedulerName)
