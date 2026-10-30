@@ -450,6 +450,9 @@ func (r *RequestPostDel) Validate() error {
 		if r.Group != "" || r.Version != "v1" || r.Resource != "pods" {
 			return fmt.Errorf("pod options only support core/v1/pods")
 		}
+		if errs := metav1validation.ValidateLabels(r.Pod.Labels, field.NewPath("pod", "labels")); len(errs) > 0 {
+			return fmt.Errorf("invalid pod labels: %v", errs.ToAggregate())
+		}
 		if len(r.Pod.NodeSelector) > 0 {
 			errs := metav1validation.ValidateLabels(r.Pod.NodeSelector, field.NewPath("pod", "nodeSelector"))
 			if len(errs) > 0 {

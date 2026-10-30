@@ -315,6 +315,32 @@ func TestRequestPostDelNodeSelectorValidation(t *testing.T) {
 	}
 }
 
+func TestRequestPostDelLabelsValidation(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		labels  map[string]string
+		wantErr bool
+	}{
+		{name: "omitted"},
+		{name: "valid", labels: map[string]string{"example.com/workload": "benchmark", "app": ""}},
+		{name: "invalid key", labels: map[string]string{"invalid key": "benchmark"}, wantErr: true},
+		{name: "invalid value", labels: map[string]string{"app": "invalid value"}, wantErr: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			request := RequestPostDel{
+				KubeGroupVersionResource: KubeGroupVersionResource{Version: "v1", Resource: "pods"},
+				Pod:                      &PostDelPodOptions{Labels: tt.labels},
+			}
+			err := request.Validate()
+			if tt.wantErr {
+				require.ErrorContains(t, err, "invalid pod labels")
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestRequestPostDelNodeSelectorUnmarshalFromYAML(t *testing.T) {
 	input := `
 version: v1
