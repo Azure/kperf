@@ -210,6 +210,12 @@ type RequestPostDel struct {
 }
 
 type PostDelPodOptions struct {
+	// Labels adds metadata labels to created Pods.
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	// ServiceAccountName selects a pre-created ServiceAccount.
+	ServiceAccountName string `json:"serviceAccountName,omitempty" yaml:"serviceAccountName,omitempty"`
+	// SchedulerName selects a scheduler; an unhandled name keeps Pods unscheduled.
+	SchedulerName string `json:"schedulerName,omitempty" yaml:"schedulerName,omitempty"`
 	// NodeSelector schedules workload Pods separately from runner Pods, for
 	// example on a dedicated node pool:
 	//
@@ -440,14 +446,18 @@ func (r *RequestPostDel) Validate() error {
 		return fmt.Errorf("payloadSize must >= 0: %v", r.PayloadSize)
 	}
 
-	if r.Pod != nil && len(r.Pod.NodeSelector) > 0 {
+	if r.Pod != nil {
 		if r.Group != "" || r.Version != "v1" || r.Resource != "pods" {
-			return fmt.Errorf("pod nodeSelector only supports core/v1/pods")
+			return fmt.Errorf("pod options only support core/v1/pods")
 		}
-
-		errs := metav1validation.ValidateLabels(r.Pod.NodeSelector, field.NewPath("pod", "nodeSelector"))
-		if len(errs) > 0 {
-			return fmt.Errorf("invalid pod nodeSelector: %v", errs.ToAggregate())
+		if errs := metav1validation.ValidateLabels(r.Pod.Labels, field.NewPath("pod", "labels")); len(errs) > 0 {
+			return fmt.Errorf("invalid pod labels: %v", errs.ToAggregate())
+		}
+		if len(r.Pod.NodeSelector) > 0 {
+			errs := metav1validation.ValidateLabels(r.Pod.NodeSelector, field.NewPath("pod", "nodeSelector"))
+			if len(errs) > 0 {
+				return fmt.Errorf("invalid pod nodeSelector: %v", errs.ToAggregate())
+			}
 		}
 	}
 

@@ -443,14 +443,17 @@ func (b *requestPatchBuilder) Build(cli rest.Interface) Requester {
 }
 
 type requestPostDelBuilder struct {
-	version         schema.GroupVersion
-	resource        string
-	resourceVersion string
-	namespace       string
-	deleteRatio     float64
-	payloadSize     int
-	nodeSelector    map[string]string
-	maxRetries      int
+	version            schema.GroupVersion
+	resource           string
+	resourceVersion    string
+	namespace          string
+	deleteRatio        float64
+	payloadSize        int
+	nodeSelector       map[string]string
+	labels             map[string]string
+	serviceAccountName string
+	schedulerName      string
+	maxRetries         int
 
 	// Per-builder cache for created resources
 	cache *Cache
@@ -460,22 +463,23 @@ type requestPostDelBuilder struct {
 }
 
 func newRequestPostDelBuilder(src *types.RequestPostDel, resourceVersion string, maxRetries int) *requestPostDelBuilder {
-	var nodeSelector map[string]string
-	if src.Pod != nil {
-		nodeSelector = src.Pod.NodeSelector
-	}
-
-	return &requestPostDelBuilder{
+	b := &requestPostDelBuilder{
 		version:         schema.GroupVersion{Group: src.Group, Version: src.Version},
 		resource:        src.Resource,
 		resourceVersion: resourceVersion,
 		namespace:       src.Namespace,
 		deleteRatio:     src.DeleteRatio,
 		payloadSize:     src.PayloadSize,
-		nodeSelector:    nodeSelector,
 		maxRetries:      maxRetries,
 		cache:           InitCache(), // Initialize the cache
 	}
+	if p := src.Pod; p != nil {
+		b.nodeSelector = p.NodeSelector
+		b.labels = p.Labels
+		b.serviceAccountName = p.ServiceAccountName
+		b.schedulerName = p.SchedulerName
+	}
+	return b
 }
 
 // Build implements RequestBuilder.Build.
@@ -524,10 +528,13 @@ func (b *requestPostDelBuilder) Build(cli rest.Interface) Requester {
 	name := fmt.Sprintf("%d-%d", timestamp, counter)
 
 	body, err := utils.RenderTemplate(b.resource, map[string]interface{}{
-		"namePattern":  name,
-		"namespace":    b.namespace,
-		"payload":      RandomPayload(b.payloadSize),
-		"nodeSelector": b.nodeSelector,
+		"namePattern":        name,
+		"namespace":          b.namespace,
+		"payload":            RandomPayload(b.payloadSize),
+		"nodeSelector":       b.nodeSelector,
+		"labels":             b.labels,
+		"serviceAccountName": b.serviceAccountName,
+		"schedulerName":      b.schedulerName,
 	})
 	if err != nil {
 		panic(fmt.Errorf("failed to render %s template: %w", b.resource, err))
