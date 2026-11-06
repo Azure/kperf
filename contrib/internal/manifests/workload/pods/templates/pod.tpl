@@ -16,10 +16,10 @@ metadata:
     {{- end }}
 spec:
   {{- if .Values.serviceAccountName }}
-  serviceAccountName: "{{ .Values.serviceAccountName }}"
+  serviceAccountName: {{ printf "%q" .Values.serviceAccountName }}
   {{- end }}
   {{- if .Values.schedulerName }}
-  schedulerName: "{{ .Values.schedulerName }}"
+  schedulerName: {{ printf "%q" .Values.schedulerName }}
   {{- end }}
   {{- if $nodeSelector }}
   nodeSelector:

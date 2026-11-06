@@ -139,24 +139,45 @@ func TestRequestPatchBuilderRendersConcurrencySafe(t *testing.T) {
 
 func TestPodOptions(t *testing.T) {
 	for _, tt := range []struct {
-		name    string
-		options *types.PostDelPodOptions
-		labels  map[string]string
+		name           string
+		options        *types.PostDelPodOptions
+		expectedLabels map[string]string
 	}{
-		{name: "defaults", labels: map[string]string{"app": "fake-pod"}},
-		{name: "empty app", options: &types.PostDelPodOptions{
-			Labels: map[string]string{"app": ""},
-		}, labels: map[string]string{"app": ""}},
-		{name: "other labels", options: &types.PostDelPodOptions{
-			Labels: map[string]string{"team": "benchmark"},
-		}, labels: map[string]string{"app": "fake-pod", "team": "benchmark"}},
-		{name: "string labels", options: &types.PostDelPodOptions{
-			Labels: map[string]string{"true": "false", "123": "456", "null": "null"},
-		}, labels: map[string]string{"app": "fake-pod", "true": "false", "123": "456", "null": "null"}},
-		{name: "custom", options: &types.PostDelPodOptions{
-			Labels: map[string]string{"app": "custom-app", "team": "benchmark"}, NodeSelector: map[string]string{"agentpool": "benchmark"},
-			ServiceAccountName: "custom-account", SchedulerName: "custom-scheduler",
-		}, labels: map[string]string{"app": "custom-app", "team": "benchmark"}},
+		{
+			name:           "defaults",
+			expectedLabels: map[string]string{"app": "fake-pod"},
+		},
+		{
+			name: "empty app",
+			options: &types.PostDelPodOptions{
+				Labels: map[string]string{"app": ""},
+			},
+			expectedLabels: map[string]string{"app": ""},
+		},
+		{
+			name: "other labels",
+			options: &types.PostDelPodOptions{
+				Labels: map[string]string{"team": "benchmark"},
+			},
+			expectedLabels: map[string]string{"app": "fake-pod", "team": "benchmark"},
+		},
+		{
+			name: "string labels",
+			options: &types.PostDelPodOptions{
+				Labels: map[string]string{"true": "false", "123": "456", "null": "null"},
+			},
+			expectedLabels: map[string]string{"app": "fake-pod", "true": "false", "123": "456", "null": "null"},
+		},
+		{
+			name: "custom",
+			options: &types.PostDelPodOptions{
+				Labels:             map[string]string{"app": "custom-app", "team": "benchmark"},
+				NodeSelector:       map[string]string{"agentpool": "benchmark"},
+				ServiceAccountName: "custom-account",
+				SchedulerName:      "custom-scheduler",
+			},
+			expectedLabels: map[string]string{"app": "custom-app", "team": "benchmark"},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			builder := newRequestPostDelBuilder(&types.RequestPostDel{
@@ -184,7 +205,7 @@ func TestPodOptions(t *testing.T) {
 			if options == nil {
 				options = &types.PostDelPodOptions{}
 			}
-			require.Equal(t, tt.labels, pod.Labels)
+			require.Equal(t, tt.expectedLabels, pod.Labels)
 			require.Equal(t, options.NodeSelector, pod.Spec.NodeSelector)
 			require.Equal(t, options.ServiceAccountName, pod.Spec.ServiceAccountName)
 			require.Equal(t, options.SchedulerName, pod.Spec.SchedulerName)
